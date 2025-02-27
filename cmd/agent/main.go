@@ -82,12 +82,7 @@ func sendHTTPRequest(baseURL, nameValue string, typeValue string, value interfac
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(resp.Body)
+	defer resp.Body.Close()
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
