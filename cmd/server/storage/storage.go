@@ -1,4 +1,4 @@
-package metric
+package storage
 
 var Store MemStorage
 
