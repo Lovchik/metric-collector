@@ -5,7 +5,6 @@ import (
 	"github.com/dranikpg/dto-mapper"
 	log "github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"metric-collector/cmd/agent/metric"
 	"net/http"
 	"reflect"
@@ -47,6 +46,7 @@ func main() {
 			}
 		}
 	}()
+	select {}
 }
 
 func UpdateMemStats() {
@@ -67,31 +67,32 @@ func sendHTTPRequest(baseURL, nameValue string, typeValue string, value interfac
 		stringValue = fmt.Sprintf("%.2f", v)
 	case int64:
 		stringValue = fmt.Sprintf("%d", v)
-		url := baseURL + typeValue + "/" + nameValue + "/" + stringValue
-		req, err := http.NewRequest("POST", url, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		req.Header.Set("Content-Type", "text/plain")
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				log.Fatal(err)
-			}
-		}(resp.Body)
-
-		responseBody, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Info("Response Status: ", resp.Status, " Response Body: ", responseBody)
 	}
 
+	url := baseURL + typeValue + "/" + nameValue + "/" + stringValue
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header.Set("Content-Type", "text/plain")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(resp.Body)
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Info("Response Status: ", resp.Status, " Response Body: ", responseBody)
+	log.Info(url)
 }

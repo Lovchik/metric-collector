@@ -56,7 +56,7 @@ func (c *Counter) Update() error {
 	if !ok {
 		return nil
 	}
-	lastFloat, ok := lastValue.(float64)
+	lastFloat, _ := lastValue.(float64)
 
 	value := lastFloat + float64(c.Value)
 	storage.Store.Set(c.GetName(), value)
