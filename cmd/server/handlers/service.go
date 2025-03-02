@@ -28,8 +28,6 @@ func (s *Service) UpdateCounter(c *gin.Context) {
 
 	}
 	c.JSON(http.StatusOK, nil)
-	return
-
 }
 
 func validateMetricsToUpdate(c *gin.Context, metricType string) {
