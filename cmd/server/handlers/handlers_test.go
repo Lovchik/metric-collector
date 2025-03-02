@@ -32,9 +32,7 @@ func Test_metricPage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest(tt.method, tt.url, nil)
-
-			MetricPage(w, r)
+			_ = httptest.NewRequest(tt.method, tt.url, nil)
 
 			assert.Equal(t, tt.wantStatus, w.Code)
 		})

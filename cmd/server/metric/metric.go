@@ -52,8 +52,9 @@ type Counter struct {
 
 func (c *Counter) Update() error {
 	lastValue, ok := storage.Store.GetValueByName(c.Name)
-
 	if !ok {
+		value := float64(c.Value)
+		storage.Store.Set(c.GetName(), value)
 		return nil
 	}
 	lastFloat, _ := lastValue.(float64)
