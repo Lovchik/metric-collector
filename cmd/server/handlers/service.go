@@ -86,3 +86,8 @@ func (s *Service) GetCounter(c *gin.Context) {
 	c.JSON(http.StatusOK, value)
 
 }
+
+func (s *Service) GetAllMetrics(context *gin.Context) {
+	all := storage.Store.GetAll()
+	context.JSON(http.StatusOK, all)
+}
