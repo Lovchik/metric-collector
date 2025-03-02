@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/dranikpg/dto-mapper"
 	log "github.com/sirupsen/logrus"
@@ -12,20 +13,31 @@ import (
 	"time"
 )
 
+var reportInterval, pollInterval int
+var flagRunAddr string
+
+func parseFlags() {
+	flag.StringVar(&flagRunAddr, "a", ":8080", "address and port to run server")
+	flag.IntVar(&reportInterval, "r", 10, "report interval")
+	flag.IntVar(&pollInterval, "p", 2, "poll interval")
+	flag.Parse()
+}
+
 var Stats metric.Metric
 
 func main() {
-	ticker := time.NewTicker(2 * time.Second)
-	ticker2 := time.NewTicker(10 * time.Second)
+	parseFlags()
+	poller := time.NewTicker(time.Duration(pollInterval) * time.Second)
+	reporter := time.NewTicker(time.Duration(reportInterval) * time.Second)
 	Stats.PollCount = 0
 	go func() {
-		for range ticker.C {
+		for range poller.C {
 			UpdateMemStats()
 			log.Info("Update MemStats")
 		}
 	}()
 	go func() {
-		for range ticker2.C {
+		for range reporter.C {
 
 			v := reflect.ValueOf(Stats)
 			t := reflect.TypeOf(Stats)
@@ -36,9 +48,9 @@ func main() {
 
 				switch field.Type.Kind() {
 				case reflect.Int64, reflect.Int32:
-					sendHTTPRequest("http://127.0.0.1:8080/update/", field.Name, "counter", value.Int())
+					sendHTTPRequest("http://"+flagRunAddr+"/update/", field.Name, "counter", value.Int())
 				case reflect.Float64:
-					sendHTTPRequest("http://127.0.0.1:8080/update/", "gauge", field.Name, value.Float())
+					sendHTTPRequest("http://"+flagRunAddr+"/update/", "gauge", field.Name, value.Float())
 				default:
 					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
 				}
