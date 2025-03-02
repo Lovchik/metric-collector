@@ -13,13 +13,11 @@ type Service struct {
 	WebServer *gin.Engine
 }
 
-func (s *Service) UpdateCounter(c *gin.Context) {
-	metricType := "counter"
-	validateMetricsToUpdate(c, metricType)
-
+func (s *Service) UpdateMetric(c *gin.Context) {
+	validateMetricsToUpdate(c)
 	newMetric := metric.NewMetric(
 		c.Param("name"),
-		metricType,
+		c.Param("type"),
 		c.Param("value"))
 	err := newMetric.Update()
 	if err != nil {
@@ -30,7 +28,13 @@ func (s *Service) UpdateCounter(c *gin.Context) {
 	c.JSON(http.StatusOK, nil)
 }
 
-func validateMetricsToUpdate(c *gin.Context, metricType string) {
+func validateMetricsToUpdate(c *gin.Context) {
+	metricType := c.Param("type")
+
+	if metricType == "" || (metricType != "counter" && metricType != "gauge") {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
 	value := c.Param("value")
 	if c.Param("name") == "" || value == "" {
 		c.AbortWithStatus(http.StatusNotFound)
@@ -44,32 +48,13 @@ func validateMetricsToUpdate(c *gin.Context, metricType string) {
 			return
 		}
 
-	} else if metricType == "counter" {
+	} else {
 		_, err := strconv.ParseInt(value, 0, 64)
 		if err != nil {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
-	} else {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
 	}
-}
-
-func (s *Service) UpdateGauge(c *gin.Context) {
-	metricType := "gauge"
-	validateMetricsToUpdate(c, metricType)
-
-	newMetric := metric.NewMetric(
-		c.Param("name"),
-		metricType,
-		c.Param("value"))
-	err := newMetric.Update()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-	}
-	c.JSON(http.StatusOK, nil)
-
 }
 
 func (s *Service) GetGauge(c *gin.Context) {
