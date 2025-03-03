@@ -19,7 +19,7 @@ func GetConfig() Config {
 }
 
 func InitConfig() {
-	flagRunAddr := flag.String("a", "8080", "Server address")
+	flagRunAddr := flag.String("a", ":8080", "Server address")
 	reportInterval := flag.Int64("r", 10, "Report interval")
 	pollInterval := flag.Int64("p", 2, "Poll interval")
 
