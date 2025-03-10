@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"log"
 	"os"
 	"strconv"
 )
@@ -27,28 +26,26 @@ func InitConfig() {
 
 	flag.Parse()
 
-	config.FlagRunAddr = getEnv("ADDRESS")
-	config.ReportInterval = getEnvInt("REPORT_INTERVAL")
-	config.PollInterval = getEnvInt("POLL_INTERVAL")
+	getEnv("ADDRESS", &config.FlagRunAddr)
+	getEnvInt("REPORT_INTERVAL", &config.ReportInterval)
+	getEnvInt("POLL_INTERVAL", &config.PollInterval)
 
 	appConfig = config
 
 }
 
-func getEnv(envName string) string {
+func getEnv(envName string, config *string) {
 	if value := os.Getenv(envName); value != "" {
-		return value
+		config = &value
 	}
-	log.Fatalf("Environment variable %s not set", envName)
-	return ""
+	return
 }
 
-func getEnvInt(envName string) int64 {
+func getEnvInt(envName string, config *int64) {
 	if value := os.Getenv(envName); value != "" {
 		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return parsed
+			config = &parsed
 		}
 	}
-	log.Fatalf("Environment variable %s not set", envName)
-	return 0
+	return
 }
