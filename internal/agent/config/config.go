@@ -19,33 +19,32 @@ func GetConfig() Config {
 }
 
 func InitConfig() {
-	var config Config
-	flag.StringVar(&config.FlagRunAddr, "a", ":8080", "Server address")
-	flag.Int64Var(&config.ReportInterval, "r", 10, "Report interval")
-	flag.Int64Var(&config.PollInterval, "p", 2, "Poll interval")
+	config := Config{}
 
-	flag.Parse()
-
-	getEnv("ADDRESS", &config.FlagRunAddr)
-	getEnvInt("REPORT_INTERVAL", &config.ReportInterval)
-	getEnvInt("POLL_INTERVAL", &config.PollInterval)
+	getEnv("ADDRESS", "a", ":8080", "Server address", &config.FlagRunAddr)
+	getEnvInt("REPORT_INTERVAL", "r", 10, "Report interval", &config.ReportInterval)
+	getEnvInt("POLL_INTERVAL", "p", 2, "Poll interval", &config.PollInterval)
 
 	appConfig = config
 
 }
 
-func getEnv(envName string, config *string) {
+func getEnv(envName, flagName, defaultValue, usage string, config *string) {
 	if value := os.Getenv(envName); value != "" {
-		config = &value
+		*config = value
+	} else {
+		flag.StringVar(config, flagName, defaultValue, usage)
+
 	}
-	return
+
 }
 
-func getEnvInt(envName string, config *int64) {
+func getEnvInt(envName string, flagName string, defaultValue int64, usage string, config *int64) {
 	if value := os.Getenv(envName); value != "" {
 		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			config = &parsed
+			*config = parsed
 		}
+	} else {
+		flag.Int64Var(config, flagName, defaultValue, usage)
 	}
-	return
 }
