@@ -1,6 +1,6 @@
 module metric-collector
 
-go 1.23
+go 1.22.12
 
 require (
 	github.com/dranikpg/dto-mapper v0.2.1
