@@ -2,10 +2,16 @@ package main
 
 import (
 	"metric-collector/internal/agent/config"
+	"metric-collector/internal/agent/metric"
 	"metric-collector/internal/agent/service"
+	"sync"
 )
 
 func main() {
 	config.InitConfig()
-	service.Start()
+	agent := service.Agent{
+		Stats:      metric.Metric{},
+		StatsMutex: sync.Mutex{},
+	}
+	agent.Start()
 }

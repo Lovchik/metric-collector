@@ -14,32 +14,34 @@ import (
 	"time"
 )
 
-var Stats metric.Metric
-var StatsMutex sync.Mutex
+type Agent struct {
+	Stats      metric.Metric
+	StatsMutex sync.Mutex
+}
 
-func Start() {
+func (a *Agent) Start() {
 	poller := time.NewTicker(time.Duration(config.GetConfig().PollInterval) * time.Second)
 	reporter := time.NewTicker(time.Duration(config.GetConfig().ReportInterval) * time.Second)
 	defer poller.Stop()
 	defer reporter.Stop()
-	Stats.PollCount = 0
+	a.Stats.PollCount = 0
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		for range poller.C {
-			updateMemStats()
+			a.updateMemStats()
 			log.Info("Update MemStats")
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		client := &http.Client{}
-		StatsMutex.Lock()
-		defer StatsMutex.Unlock()
+		a.StatsMutex.Lock()
+		defer a.StatsMutex.Unlock()
 		for range reporter.C {
-			v := reflect.ValueOf(Stats)
-			t := reflect.TypeOf(Stats)
+			v := reflect.ValueOf(a.Stats)
+			t := reflect.TypeOf(a.Stats)
 
 			for i := 0; i < v.NumField(); i++ {
 				field := t.Field(i)
@@ -62,16 +64,16 @@ func Start() {
 	wg.Wait()
 }
 
-func updateMemStats() {
+func (a *Agent) updateMemStats() {
 	var runtimeStats runtime.MemStats
 	runtime.ReadMemStats(&runtimeStats)
-	StatsMutex.Lock()
-	defer StatsMutex.Unlock()
-	err := dto.Map(&Stats, runtimeStats)
+	a.StatsMutex.Lock()
+	defer a.StatsMutex.Unlock()
+	err := dto.Map(&a.Stats, runtimeStats)
 	if err != nil {
 		log.Fatal(err)
 	}
-	Stats.PollCount = Stats.PollCount + 1
+	a.Stats.PollCount = a.Stats.PollCount + 1
 }
 
 func sendHTTPRequest(baseURL, nameValue string, typeValue string, value interface{}, client *http.Client) {
@@ -86,7 +88,7 @@ func sendHTTPRequest(baseURL, nameValue string, typeValue string, value interfac
 	url := baseURL + typeValue + "/" + nameValue + "/" + stringValue
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 
 	req.Header.Set("Content-Type", "text/plain")

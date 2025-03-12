@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"metric-collector/internal/server/config"
-	handlers2 "metric-collector/internal/server/handlers"
+	"metric-collector/internal/server/handlers"
 	"metric-collector/internal/server/services"
 	"metric-collector/internal/server/storage"
 )
@@ -23,7 +23,7 @@ func Serve() {
 	ginConfig.AllowAllOrigins = true
 	s.WebServer.Use(cors.New(ginConfig))
 	api := s.WebServer.Group("/")
-	handlers2.MetricRouter(api.Group(""), s)
+	handlers.MetricRouter(api.Group(""), s)
 	err := s.WebServer.Run(config.GetConfig().FlagRunAddr)
 	if err != nil {
 		log.Error(err)
