@@ -12,10 +12,10 @@ func NewMemStorage() *MemStorage {
 }
 
 type Storage interface {
-	Set(name string, value any)
-	GetValueByName(name string) (any, bool)
-	GetAll() map[string]any
-	Update()
+	SetMetric(name string, value any)
+	GetMetricValueByName(name string) (any, bool)
+	GetAllMetrics() map[string]any
+	UpdateMetric()
 }
 
 func (m *MemStorage) Set(name string, value any) {
