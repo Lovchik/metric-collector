@@ -15,8 +15,8 @@ import (
 )
 
 type Agent struct {
-	Stats      metric.Metric
-	StatsMutex sync.Mutex
+	Stats   metric.Metric
+	StatsMu sync.Mutex
 }
 
 func (a *Agent) Start() {
@@ -37,8 +37,8 @@ func (a *Agent) Start() {
 	go func() {
 		defer wg.Done()
 		client := &http.Client{}
-		a.StatsMutex.Lock()
-		defer a.StatsMutex.Unlock()
+		a.StatsMu.Lock()
+		defer a.StatsMu.Unlock()
 		for range reporter.C {
 			v := reflect.ValueOf(a.Stats)
 			t := reflect.TypeOf(a.Stats)
@@ -67,8 +67,8 @@ func (a *Agent) Start() {
 func (a *Agent) updateMemStats() {
 	var runtimeStats runtime.MemStats
 	runtime.ReadMemStats(&runtimeStats)
-	a.StatsMutex.Lock()
-	defer a.StatsMutex.Unlock()
+	a.StatsMu.Lock()
+	defer a.StatsMu.Unlock()
 	err := dto.Map(&a.Stats, runtimeStats)
 	if err != nil {
 		log.Fatal(err)
@@ -101,7 +101,8 @@ func sendHTTPRequest(baseURL, nameValue string, typeValue string, value interfac
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return
 	}
 	log.Info("Response Status: ", resp.Status, " Response Body: ", responseBody)
 	log.Info(url)

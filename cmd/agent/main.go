@@ -10,8 +10,8 @@ import (
 func main() {
 	config.InitConfig()
 	agent := service.Agent{
-		Stats:      metric.Metric{},
-		StatsMutex: sync.Mutex{},
+		Stats:   metric.Metric{},
+		StatsMu: sync.Mutex{},
 	}
 	agent.Start()
 }
