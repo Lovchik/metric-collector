@@ -1,25 +1,30 @@
-package handlers
+package services
 
 import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"metric-collector/cmd/server/metric"
-	"metric-collector/cmd/server/storage"
+	"metric-collector/internal/server/metric"
+	"metric-collector/internal/server/storage"
 	"net/http"
 	"strconv"
 )
 
 type Service struct {
 	WebServer *gin.Engine
+	Store     *storage.MemStorage
 }
 
 func (s *Service) UpdateMetric(c *gin.Context) {
 	validateMetricsToUpdate(c)
-	newMetric := metric.NewMetric(
+	newMetric, err := metric.NewMetric(
 		c.Param("name"),
 		c.Param("type"),
 		c.Param("value"))
-	err := newMetric.Update()
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	err = s.Store.Update(newMetric)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
@@ -63,7 +68,7 @@ func (s *Service) GetGauge(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	value, exists := storage.Store.GetValueByName(name)
+	value, exists := s.Store.GetValueByName(name)
 	if !exists {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -77,7 +82,7 @@ func (s *Service) GetCounter(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	value, exists := storage.Store.GetValueByName(name)
+	value, exists := s.Store.GetValueByName(name)
 	if !exists {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -88,6 +93,6 @@ func (s *Service) GetCounter(c *gin.Context) {
 }
 
 func (s *Service) GetAllMetrics(context *gin.Context) {
-	all := storage.Store.GetAll()
+	all := s.Store.GetAll()
 	context.JSON(http.StatusOK, all)
 }
