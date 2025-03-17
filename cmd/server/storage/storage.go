@@ -11,6 +11,7 @@ func NewMemStorage() {
 type Storage interface {
 	Set(name string, value any)
 	GetValueByName(name string) (any, bool)
+	GetAll() map[string]any
 }
 
 func (m *MemStorage) Set(name string, value any) {
@@ -23,4 +24,8 @@ func (m *MemStorage) GetValueByName(name string) (any, bool) {
 
 type MemStorage struct {
 	metrics map[string]any
+}
+
+func (m *MemStorage) GetAll() map[string]any {
+	return m.metrics
 }
