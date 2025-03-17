@@ -1,6 +1,7 @@
 package metric
 
 import (
+	"metric-collector/cmd/server/storage"
 	"strconv"
 )
 
@@ -28,7 +29,7 @@ func (g *Gauge) GetValue() any {
 }
 
 func (g *Gauge) Update() error {
-	Store.Set(g.Name, g.GetValue())
+	storage.Store.Set(g.Name, g.GetValue())
 	return nil
 }
 
@@ -50,14 +51,14 @@ type Counter struct {
 }
 
 func (c *Counter) Update() error {
-	lastValue, ok := Store.GetValueByName(c.Name)
+	lastValue, ok := storage.Store.GetValueByName(c.Name)
 
 	if !ok {
 		return nil
 	}
-	lastFloat, ok := lastValue.(float64)
+	lastFloat, _ := lastValue.(float64)
 
 	value := lastFloat + float64(c.Value)
-	Store.Set(c.GetName(), value)
+	storage.Store.Set(c.GetName(), value)
 	return nil
 }
