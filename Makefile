@@ -15,6 +15,9 @@ autotests-4:
 autotests-5:
 	@echo Running autotests
 	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration5$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8081 -source-path=.
+autotests-6:
+	@echo Running autotests
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration6$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8081 -source-path=.
 build:
 	@echo Build App
 	go build -o cmd/metrics/server cmd/server/main.go
@@ -22,3 +25,11 @@ build:
 build-agent:
 	@echo Build agent
 	go build -o cmd/metrics/agent cmd/agent/main.go
+
+start-agent:
+	@echo Start agent
+	./cmd/metrics/agent
+
+start-server:
+	@echo Start server
+	./cmd/metrics/server

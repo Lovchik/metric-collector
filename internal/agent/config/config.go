@@ -21,7 +21,7 @@ func GetConfig() Config {
 func InitConfig() {
 	config := Config{}
 
-	getEnv("ADDRESS", "a", ":8080", "Server address", &config.FlagRunAddr)
+	getEnv("ADDRESS", "a", ":8081", "Server address", &config.FlagRunAddr)
 	getEnvInt("REPORT_INTERVAL", "r", 10, "Report interval", &config.ReportInterval)
 	getEnvInt("POLL_INTERVAL", "p", 2, "Poll interval", &config.PollInterval)
 	flag.Parse()
