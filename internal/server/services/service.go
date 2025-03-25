@@ -41,8 +41,8 @@ func (s *Service) UpdateMetricViaJson(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, nil)
 		return
 	}
-	validateMetricsToUpdateViaJson(ctx, metrics)
-	newMetric, err := metric.NewMetricFromJson(metrics)
+	validateMetricsToUpdateViaJSON(ctx, metrics)
+	newMetric, err := metric.NewMetricFromJSON(metrics)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, nil)
 		return
@@ -67,7 +67,7 @@ func (s *Service) UpdateMetricViaJson(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, metrics)
 }
 
-func validateMetricsToUpdateViaJson(ctx *gin.Context, metrics metric.Metrics) {
+func validateMetricsToUpdateViaJSON(ctx *gin.Context, metrics metric.Metrics) {
 	if validateType(ctx, metrics) {
 		return
 	}

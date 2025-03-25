@@ -11,7 +11,7 @@ type Metric interface {
 	GetValue() any
 }
 
-func NewMetricFromJson(metrics Metrics) (Metric, error) {
+func NewMetricFromJSON(metrics Metrics) (Metric, error) {
 	if metrics.MType == "gauge" {
 		if metrics.Value == nil {
 			err := errors.New("empty metric gauge value")
