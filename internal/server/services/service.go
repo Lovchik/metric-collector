@@ -32,6 +32,17 @@ func (s *Service) UpdateMetric(ctx *gin.Context) {
 		return
 
 	}
+	value := newMetric.GetValue()
+
+	if metrics.MType == "gauge" {
+		if v, ok := value.(float64); ok {
+			metrics.Value = &v
+		}
+	} else {
+		if v, ok := value.(int64); ok {
+			metrics.Delta = &v
+		}
+	}
 	ctx.JSON(http.StatusOK, metrics)
 }
 
@@ -91,7 +102,11 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 	if metrics.MType == "counter" {
 		metrics.Delta = new(int64)
 		log.Info("metric counter value: ", value)
-		counterValue := value.(int64)
+		counterValue, ok := value.(int64)
+		if !ok {
+			ctx.JSON(http.StatusBadRequest, nil)
+			return
+		}
 		metrics.Delta = &counterValue
 
 	}
@@ -99,7 +114,11 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 		metrics.Value = new(float64)
 		log.Info("metric gauge value: ", value)
 
-		gaugeValue := value.(float64)
+		gaugeValue, ok := value.(float64)
+		if !ok {
+			ctx.JSON(http.StatusBadRequest, nil)
+			return
+		}
 		metrics.Value = &gaugeValue
 
 	}

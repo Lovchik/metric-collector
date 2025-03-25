@@ -47,16 +47,17 @@ func (a *Agent) Start() {
 
 			for i := 0; i < v.NumField(); i++ {
 				field := t.Field(i)
+				value := v.Field(i)
 				metricToUpload := metric.MetricsToUpload{
 					ID: field.Name,
 				}
-				value := v.Field(i)
 
 				switch field.Type.Kind() {
 				case reflect.Int64, reflect.Int32:
 					metricToUpload.MType = "counter"
 					metricToUpload.Delta = new(int64)
-					*metricToUpload.Delta = value.Int()
+					i2 := value.Int()
+					metricToUpload.Delta = &i2
 
 				case reflect.Float64:
 					metricToUpload.MType = "gauge"
@@ -78,8 +79,6 @@ func (a *Agent) Start() {
 func (a *Agent) updateMemStats() {
 	var runtimeStats runtime.MemStats
 	runtime.ReadMemStats(&runtimeStats)
-	a.StatsMu.Lock()
-	defer a.StatsMu.Unlock()
 	err := dto.Map(&a.Stats, runtimeStats)
 	if err != nil {
 		log.Fatal(err)
@@ -111,6 +110,7 @@ func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, clie
 		log.Error(err)
 		return
 	}
-	log.Info("Response Status: ", resp.Status, " Response Body: ", responseBody)
+
+	log.Info("Response Status: ", resp.Status, " Response Body: ", string(responseBody))
 	log.Info(baseURL)
 }

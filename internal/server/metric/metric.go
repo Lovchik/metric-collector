@@ -13,7 +13,7 @@ type Metric interface {
 func NewMetric(metrics Metrics) (Metric, error) {
 	if metrics.MType == "gauge" {
 		if metrics.Value == nil {
-			err := errors.New("Empty metric gauge value")
+			err := errors.New("empty metric gauge value")
 			log.Error(err)
 			return nil, err
 
@@ -55,8 +55,8 @@ type Counter struct {
 }
 
 type Metrics struct {
-	ID    string   `json:"id,required"`      // имя метрики
-	MType string   `json:"type,required"`    // параметр, принимающий значение gauge или counter
+	ID    string   `json:"id"`               // имя метрики
+	MType string   `json:"type"`             // параметр, принимающий значение gauge или counter
 	Delta *int64   `json:"delta,omitempty" ` // значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty" ` // значение метрики в случае передачи gauge
 }

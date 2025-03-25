@@ -33,8 +33,8 @@ type Metric struct {
 }
 
 type MetricsToUpload struct {
-	ID    string   `json:"id,required"`                                      // имя метрики
-	MType string   `json:"type,required"`                                    // параметр, принимающий значение gauge или counter
+	ID    string   `json:"id"`                                               // имя метрики
+	MType string   `json:"type"`                                             // параметр, принимающий значение gauge или counter
 	Delta *int64   `json:"delta,omitempty" binding:"required_without=Value"` // значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty" binding:"required_without=Delta"` // значение метрики в случае передачи gauge
 }

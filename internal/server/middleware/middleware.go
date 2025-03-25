@@ -24,8 +24,10 @@ func LoggerMiddleware() gin.HandlerFunc {
 		duration := time.Since(startTime)
 
 		log.Printf("[Request] Method: %s | URI: %s | Duration: %v", c.Request.Method, c.Request.RequestURI, duration)
+		log.Printf("[Request] Body: %s", string(bodyBytes))
 
-		log.Printf("[Response] Status: %d | Content-Length: %d", c.Writer.Status(), responseBody.String())
+		log.Printf("[Response] Status: %d | Content-Length: %d", c.Writer.Status(), responseBody.Len())
+		log.Printf("[Response] Body: %s", responseBody.String())
 	}
 }
 
