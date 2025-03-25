@@ -7,6 +7,7 @@ import (
 	"github.com/dranikpg/dto-mapper"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"math/rand"
 	"metric-collector/internal/agent/config"
 	"metric-collector/internal/agent/metric"
 	"net/http"
@@ -39,8 +40,6 @@ func (a *Agent) Start() {
 	go func() {
 		defer wg.Done()
 		client := &http.Client{}
-		a.StatsMu.Lock()
-		defer a.StatsMu.Unlock()
 		for range reporter.C {
 			v := reflect.ValueOf(a.Stats)
 			t := reflect.TypeOf(a.Stats)
@@ -84,6 +83,7 @@ func (a *Agent) updateMemStats() {
 		log.Fatal(err)
 	}
 	a.Stats.PollCount = a.Stats.PollCount + 1
+	a.Stats.RandomValue = rand.Float64()
 }
 
 func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, client *http.Client) {

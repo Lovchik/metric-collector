@@ -7,7 +7,7 @@ import (
 )
 
 func MetricRouter(router *gin.RouterGroup, s *services.Service) {
-	router.POST("/update", middleware.LoggerMiddleware(), s.UpdateMetricViaJson)
+	router.POST("/update", middleware.LoggerMiddleware(), s.UpdateMetricViaJSON)
 	router.POST("/value", middleware.LoggerMiddleware(), s.GetMetric)
 	router.GET("", middleware.LoggerMiddleware(), s.GetAllMetrics)
 	router.POST("update/:type/:name/:value", middleware.LoggerMiddleware(), s.UpdateMetric)

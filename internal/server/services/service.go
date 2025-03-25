@@ -34,7 +34,7 @@ func (s *Service) UpdateMetric(c *gin.Context) {
 	c.JSON(http.StatusOK, nil)
 }
 
-func (s *Service) UpdateMetricViaJson(ctx *gin.Context) {
+func (s *Service) UpdateMetricViaJSON(ctx *gin.Context) {
 	var metrics metric.Metrics
 
 	if err := ctx.ShouldBindJSON(&metrics); err != nil {

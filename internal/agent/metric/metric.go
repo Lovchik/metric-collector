@@ -1,33 +1,33 @@
 package metric
 
 type Metric struct {
-	Alloc         int64
-	BuckHashSys   int64
-	Frees         int64
+	Alloc         float64
+	BuckHashSys   float64
+	Frees         float64
 	GCCPUFraction float64
-	GCSys         int64
-	HeapAlloc     int64
-	HeapIdle      int64
-	HeapInuse     int64
-	HeapObjects   int64
-	HeapReleased  int64
-	HeapSys       int64
-	LastGC        int64
-	Lookups       int64
-	MCacheInuse   int64
-	MCacheSys     int64
-	MSpanInuse    int64
-	MSpanSys      int64
-	Mallocs       int64
-	NextGC        int64
-	NumForcedGC   int64
-	NumGC         int32
-	OtherSys      int64
-	PauseTotalNs  int64
-	StackInuse    int64
-	StackSys      int64
-	Sys           int64
-	TotalAlloc    int64
+	GCSys         float64
+	HeapAlloc     float64
+	HeapIdle      float64
+	HeapInuse     float64
+	HeapObjects   float64
+	HeapReleased  float64
+	HeapSys       float64
+	LastGC        float64
+	Lookups       float64
+	MCacheInuse   float64
+	MCacheSys     float64
+	MSpanInuse    float64
+	MSpanSys      float64
+	Mallocs       float64
+	NextGC        float64
+	NumForcedGC   float64
+	NumGC         float64
+	OtherSys      float64
+	PauseTotalNs  float64
+	StackInuse    float64
+	StackSys      float64
+	Sys           float64
+	TotalAlloc    float64
 	PollCount     int64
 	RandomValue   float64
 }
