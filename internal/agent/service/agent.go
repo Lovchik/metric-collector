@@ -1,6 +1,8 @@
 package service
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/dranikpg/dto-mapper"
 	log "github.com/sirupsen/logrus"
@@ -45,16 +47,25 @@ func (a *Agent) Start() {
 
 			for i := 0; i < v.NumField(); i++ {
 				field := t.Field(i)
+				metricToUpload := metric.MetricsToUpload{
+					ID: field.Name,
+				}
 				value := v.Field(i)
 
 				switch field.Type.Kind() {
 				case reflect.Int64, reflect.Int32:
-					sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update/", field.Name, "counter", value.Int(), client)
+					metricToUpload.MType = "counter"
+					metricToUpload.Delta = new(int64)
+					*metricToUpload.Delta = value.Int()
+
 				case reflect.Float64:
-					sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update/", "gauge", field.Name, value.Float(), client)
+					metricToUpload.MType = "gauge"
+					metricToUpload.Value = new(float64)
+					*metricToUpload.Value = value.Float()
 				default:
 					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
 				}
+				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", metricToUpload, client)
 
 			}
 		}
@@ -76,22 +87,18 @@ func (a *Agent) updateMemStats() {
 	a.Stats.PollCount = a.Stats.PollCount + 1
 }
 
-func sendHTTPRequest(baseURL, nameValue string, typeValue string, value interface{}, client *http.Client) {
-	var stringValue string
-	switch v := value.(type) {
-	case float64:
-		stringValue = fmt.Sprintf("%.2f", v)
-	case int64:
-		stringValue = fmt.Sprintf("%d", v)
-	}
+func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, client *http.Client) {
 
-	url := baseURL + typeValue + "/" + nameValue + "/" + stringValue
-	req, err := http.NewRequest("POST", url, nil)
+	jsonData, err := json.Marshal(metricToUpload)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req, err := http.NewRequest("POST", baseURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Error(err)
 	}
 
-	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -105,5 +112,5 @@ func sendHTTPRequest(baseURL, nameValue string, typeValue string, value interfac
 		return
 	}
 	log.Info("Response Status: ", resp.Status, " Response Body: ", responseBody)
-	log.Info(url)
+	log.Info(baseURL)
 }

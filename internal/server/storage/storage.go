@@ -34,28 +34,29 @@ func (m *MemStorage) GetAll() map[string]any {
 	return m.metrics
 }
 
-func (m *MemStorage) Update(metr metric.Metric) error {
+func (m *MemStorage) Update(metr metric.Metric) (metric.Metric, error) {
 	if counter, ok := metr.(*metric.Counter); ok {
 		lastValue, ok := m.GetValueByName(counter.GetName())
 		if !ok {
-			value := float64(counter.GetValue().(int64))
+			value := counter.GetValue().(int64)
 			m.Set(counter.GetName(), value)
-			return nil
+			return counter, nil
 		}
-		lastFloat, ok := lastValue.(float64)
+		lastInt, ok := lastValue.(int64)
 		if !ok {
-			return errors.New("last value is not a float64")
+			return nil, errors.New("last value is not a float64")
 		}
 
-		value := lastFloat + float64(counter.GetValue().(int64))
+		value := lastInt + (counter.GetValue().(int64))
 		m.Set(counter.GetName(), value)
-		return nil
+		counter.Value = value
+		return counter, nil
 	}
 
 	if gauge, ok := metr.(*metric.Gauge); ok {
 		m.Set(gauge.GetName(), gauge.GetValue().(float64))
-		return nil
+		return gauge, nil
 	}
 
-	return errors.New("unknown metric type")
+	return nil, errors.New("unknown metric type")
 }

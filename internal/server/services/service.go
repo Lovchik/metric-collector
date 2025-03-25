@@ -6,7 +6,6 @@ import (
 	"metric-collector/internal/server/metric"
 	"metric-collector/internal/server/storage"
 	"net/http"
-	"strconv"
 )
 
 type Service struct {
@@ -14,81 +13,97 @@ type Service struct {
 	Store     *storage.MemStorage
 }
 
-func (s *Service) UpdateMetric(c *gin.Context) {
-	validateMetricsToUpdate(c)
-	newMetric, err := metric.NewMetric(
-		c.Param("name"),
-		c.Param("type"),
-		c.Param("value"))
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+func (s *Service) UpdateMetric(ctx *gin.Context) {
+	var metrics metric.Metrics
+
+	if err := ctx.ShouldBindJSON(&metrics); err != nil {
+		ctx.JSON(http.StatusBadRequest, nil)
 		return
 	}
-	err = s.Store.Update(newMetric)
+	validateMetricsToUpdate(ctx, metrics)
+	newMetric, err := metric.NewMetric(metrics)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, nil)
+		return
+	}
+	newMetric, err = s.Store.Update(newMetric)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, nil)
 		return
 
 	}
-	c.JSON(http.StatusOK, nil)
+	ctx.JSON(http.StatusOK, metrics)
 }
 
-func validateMetricsToUpdate(c *gin.Context) {
-	metricType := c.Param("type")
-
-	if metricType == "" || (metricType != "counter" && metricType != "gauge") {
-		c.AbortWithStatus(http.StatusBadRequest)
+func validateMetricsToUpdate(ctx *gin.Context, metrics metric.Metrics) {
+	if validateType(ctx, metrics) {
 		return
 	}
-	value := c.Param("value")
-	if c.Param("name") == "" || value == "" {
-		c.AbortWithStatus(http.StatusNotFound)
+
+	if metrics.ID == "" || (metrics.Value == nil && metrics.Delta == nil) {
+		ctx.JSON(http.StatusNotFound, nil)
 		return
 
 	}
-	if metricType == "gauge" {
-		_, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			c.AbortWithStatus(http.StatusBadRequest)
+	if metrics.MType == "gauge" {
+
+		if metrics.Value == nil {
+			ctx.JSON(http.StatusBadRequest, nil)
 			return
 		}
 
 	} else {
-		_, err := strconv.ParseInt(value, 0, 64)
-		if err != nil {
-			c.AbortWithStatus(http.StatusBadRequest)
+		if metrics.Delta == nil {
+			ctx.JSON(http.StatusBadRequest, nil)
 			return
 		}
 	}
 }
 
-func (s *Service) GetGauge(c *gin.Context) {
-	name := c.Param("name")
-	if name == "" {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
+func validateType(ctx *gin.Context, metrics metric.Metrics) bool {
+	if metrics.MType == "" || (metrics.MType != "counter" && metrics.MType != "gauge") {
+		ctx.JSON(http.StatusBadRequest, nil)
+		return true
 	}
-	value, exists := s.Store.GetValueByName(name)
-	if !exists {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-	c.JSON(http.StatusOK, value)
+	return false
 }
 
-func (s *Service) GetCounter(c *gin.Context) {
-	name := c.Param("name")
-	if name == "" {
-		c.AbortWithStatus(http.StatusNotFound)
+func (s *Service) GetMetric(ctx *gin.Context) {
+	var metrics metric.Metrics
+
+	if err := ctx.ShouldBindJSON(&metrics); err != nil {
+		ctx.JSON(http.StatusBadRequest, nil)
 		return
 	}
-	value, exists := s.Store.GetValueByName(name)
+	if validateType(ctx, metrics) {
+		return
+	}
+
+	if metrics.ID == "" {
+		ctx.JSON(http.StatusNotFound, nil)
+		return
+	}
+	value, exists := s.Store.GetValueByName(metrics.ID)
 	if !exists {
-		c.AbortWithStatus(http.StatusNotFound)
+		ctx.JSON(http.StatusNotFound, nil)
 		return
 	}
-	log.Info(value)
-	c.JSON(http.StatusOK, value)
+	if metrics.MType == "counter" {
+		metrics.Delta = new(int64)
+		log.Info("metric counter value: ", value)
+		counterValue := value.(int64)
+		metrics.Delta = &counterValue
+
+	}
+	if metrics.MType == "gauge" {
+		metrics.Value = new(float64)
+		log.Info("metric gauge value: ", value)
+
+		gaugeValue := value.(float64)
+		metrics.Value = &gaugeValue
+
+	}
+	ctx.JSON(http.StatusOK, metrics)
 
 }
 

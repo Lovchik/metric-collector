@@ -25,7 +25,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 		log.Printf("[Request] Method: %s | URI: %s | Duration: %v", c.Request.Method, c.Request.RequestURI, duration)
 
-		log.Printf("[Response] Status: %d | Content-Length: %d", c.Writer.Status(), responseBody.Len())
+		log.Printf("[Response] Status: %d | Content-Length: %d", c.Writer.Status(), responseBody.String())
 	}
 }
 
