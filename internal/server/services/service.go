@@ -6,6 +6,7 @@ import (
 	"metric-collector/internal/server/metric"
 	"metric-collector/internal/server/storage"
 	"net/http"
+	"strconv"
 )
 
 type Service struct {
@@ -13,15 +14,35 @@ type Service struct {
 	Store     *storage.MemStorage
 }
 
-func (s *Service) UpdateMetric(ctx *gin.Context) {
+func (s *Service) UpdateMetric(c *gin.Context) {
+	validateMetricsToUpdate(c)
+	newMetric, err := metric.NewMetric(
+		c.Param("name"),
+		c.Param("type"),
+		c.Param("value"))
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	metr, err := s.Store.Update(newMetric)
+	log.Info(metr)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+func (s *Service) UpdateMetricViaJson(ctx *gin.Context) {
 	var metrics metric.Metrics
 
 	if err := ctx.ShouldBindJSON(&metrics); err != nil {
 		ctx.JSON(http.StatusBadRequest, nil)
 		return
 	}
-	validateMetricsToUpdate(ctx, metrics)
-	newMetric, err := metric.NewMetric(metrics)
+	validateMetricsToUpdateViaJson(ctx, metrics)
+	newMetric, err := metric.NewMetricFromJson(metrics)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, nil)
 		return
@@ -46,7 +67,7 @@ func (s *Service) UpdateMetric(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, metrics)
 }
 
-func validateMetricsToUpdate(ctx *gin.Context, metrics metric.Metrics) {
+func validateMetricsToUpdateViaJson(ctx *gin.Context, metrics metric.Metrics) {
 	if validateType(ctx, metrics) {
 		return
 	}
@@ -104,7 +125,7 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 		log.Info("metric counter value: ", value)
 		counterValue, ok := value.(int64)
 		if !ok {
-			ctx.JSON(http.StatusBadRequest, nil)
+			ctx.JSON(http.StatusNotFound, nil)
 			return
 		}
 		metrics.Delta = &counterValue
@@ -116,7 +137,7 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 
 		gaugeValue, ok := value.(float64)
 		if !ok {
-			ctx.JSON(http.StatusBadRequest, nil)
+			ctx.JSON(http.StatusNotFound, nil)
 			return
 		}
 		metrics.Value = &gaugeValue
@@ -129,4 +150,63 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 func (s *Service) GetAllMetrics(context *gin.Context) {
 	all := s.Store.GetAll()
 	context.JSON(http.StatusOK, all)
+}
+
+func (s *Service) GetGauge(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	value, exists := s.Store.GetValueByName(name)
+	if !exists {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	c.JSON(http.StatusOK, value)
+}
+
+func (s *Service) GetCounter(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	value, exists := s.Store.GetValueByName(name)
+	if !exists {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	log.Info(value)
+	c.JSON(http.StatusOK, value)
+
+}
+
+func validateMetricsToUpdate(c *gin.Context) {
+	metricType := c.Param("type")
+
+	if metricType == "" || (metricType != "counter" && metricType != "gauge") {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	value := c.Param("value")
+	if c.Param("name") == "" || value == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+
+	}
+	if metricType == "gauge" {
+		_, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+
+	} else {
+		_, err := strconv.ParseInt(value, 0, 64)
+		if err != nil {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+	}
 }

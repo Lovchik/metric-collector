@@ -101,7 +101,8 @@ func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, clie
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return
 	}
 	defer resp.Body.Close()
 

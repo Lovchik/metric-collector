@@ -3,6 +3,7 @@ package metric
 import (
 	"errors"
 	log "github.com/sirupsen/logrus"
+	"strconv"
 )
 
 type Metric interface {
@@ -10,7 +11,7 @@ type Metric interface {
 	GetValue() any
 }
 
-func NewMetric(metrics Metrics) (Metric, error) {
+func NewMetricFromJson(metrics Metrics) (Metric, error) {
 	if metrics.MType == "gauge" {
 		if metrics.Value == nil {
 			err := errors.New("empty metric gauge value")
@@ -59,4 +60,23 @@ type Metrics struct {
 	MType string   `json:"type"`             // параметр, принимающий значение gauge или counter
 	Delta *int64   `json:"delta,omitempty" ` // значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty" ` // значение метрики в случае передачи gauge
+}
+
+func NewMetric(metricName, metricType, metricValue string) (Metric, error) {
+	if metricType == "gauge" {
+		value, err := strconv.ParseFloat(metricValue, 64)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+
+		}
+		return &Gauge{metricName, value}, nil
+	} else {
+		value, err := strconv.ParseInt(metricValue, 0, 64)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		return &Counter{metricName, value}, nil
+	}
 }
