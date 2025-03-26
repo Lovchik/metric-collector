@@ -19,7 +19,7 @@ func NewMetricFromJSON(metrics Metrics) (Metric, error) {
 			return nil, err
 
 		}
-		return &Gauge{metrics.ID, *metrics.Value}, nil
+		return Gauge{metrics.ID, *metrics.Value}, nil
 	} else {
 
 		if metrics.Delta == nil {
@@ -27,14 +27,14 @@ func NewMetricFromJSON(metrics Metrics) (Metric, error) {
 			log.Error(err)
 			return nil, err
 		}
-		return &Counter{metrics.ID, *metrics.Delta}, nil
+		return Counter{metrics.ID, *metrics.Delta}, nil
 	}
 }
 
-func (g *Gauge) GetName() string {
+func (g Gauge) GetName() string {
 	return g.Name
 }
-func (g *Gauge) GetValue() any {
+func (g Gauge) GetValue() any {
 	return g.Value
 }
 
@@ -43,10 +43,10 @@ type Gauge struct {
 	Value float64
 }
 
-func (c *Counter) GetValue() any {
+func (c Counter) GetValue() any {
 	return c.Value
 }
-func (c *Counter) GetName() string {
+func (c Counter) GetName() string {
 	return c.Name
 }
 
@@ -70,13 +70,13 @@ func NewMetric(metricName, metricType, metricValue string) (Metric, error) {
 			return nil, err
 
 		}
-		return &Gauge{metricName, value}, nil
+		return Gauge{metricName, value}, nil
 	} else {
 		value, err := strconv.ParseInt(metricValue, 0, 64)
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
-		return &Counter{metricName, value}, nil
+		return Counter{metricName, value}, nil
 	}
 }

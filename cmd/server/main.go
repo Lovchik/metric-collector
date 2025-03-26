@@ -8,6 +8,7 @@ import (
 	"metric-collector/internal/server/handlers"
 	"metric-collector/internal/server/services"
 	"metric-collector/internal/server/storage"
+	"time"
 )
 
 func main() {
@@ -19,6 +20,23 @@ func Serve() {
 	s := &services.Service{}
 	s.WebServer = gin.Default()
 	s.Store = storage.NewMemStorage()
+	if config.GetConfig().Restore {
+		err := s.Store.LoadMetricsInMemory(config.GetConfig().FileStoragePath)
+		if err != nil {
+			log.Fatalf("Error loading metrics: %v", err)
+		}
+	}
+	go func() {
+		for {
+			if config.GetConfig().StoreInterval > 0 {
+				time.Sleep(time.Duration(config.GetConfig().StoreInterval) * time.Second)
+			}
+			err := s.Store.SaveMemoryInfo(config.GetConfig().FileStoragePath)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+	}()
 	ginConfig := cors.DefaultConfig()
 	ginConfig.AllowAllOrigins = true
 	s.WebServer.Use(cors.New(ginConfig))
