@@ -129,6 +129,9 @@ func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, clie
 		}
 		defer gr.Close()
 		responseBody, err = io.ReadAll(gr)
+		if err != nil {
+			log.Error(err)
+		}
 	} else {
 		responseBody, err = io.ReadAll(resp.Body)
 	}
