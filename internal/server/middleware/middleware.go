@@ -2,11 +2,19 @@ package middleware
 
 import (
 	"bytes"
+	"compress/gzip"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"net/http"
+	"strings"
 	"time"
 )
+
+type gzipWriter struct {
+	gin.ResponseWriter
+	writer *gzip.Writer
+}
 
 func LoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -39,4 +47,37 @@ type responseWriter struct {
 func (w *responseWriter) Write(b []byte) (int, error) {
 	w.body.Write(b) // Записываем в буфер
 	return w.ResponseWriter.Write(b)
+}
+
+func GzipMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ow := c.Writer
+		contentType := c.ContentType()
+
+		// Проверяем поддержку gzip у клиента
+		if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") &&
+			(contentType == "application/json" || contentType == "text/html") {
+			gw := gzip.NewWriter(ow)
+			c.Writer = &gzipWriter{ResponseWriter: ow, writer: gw}
+			defer gw.Close()
+			c.Header("Content-Encoding", "gzip")
+		}
+
+		// Проверяем, отправил ли клиент сжатые данные
+		if strings.Contains(c.GetHeader("Content-Encoding"), "gzip") {
+			gr, err := gzip.NewReader(c.Request.Body)
+			if err != nil {
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+			defer gr.Close()
+			c.Request.Body = io.NopCloser(gr)
+		}
+
+		c.Next()
+	}
+}
+
+func (g *gzipWriter) Write(data []byte) (int, error) {
+	return g.writer.Write(data)
 }

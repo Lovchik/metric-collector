@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/dranikpg/dto-mapper"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -87,17 +89,29 @@ func (a *Agent) updateMemStats() {
 }
 
 func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, client *http.Client) {
-
 	jsonData, err := json.Marshal(metricToUpload)
 	if err != nil {
 		log.Fatal(err)
 	}
-	req, err := http.NewRequest("POST", baseURL, bytes.NewBuffer(jsonData))
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, err = gz.Write(jsonData)
 	if err != nil {
 		log.Error(err)
+		return
+	}
+	gz.Close()
+
+	req, err := http.NewRequest("POST", baseURL, &buf)
+	if err != nil {
+		log.Error(err)
+		return
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -106,7 +120,19 @@ func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, clie
 	}
 	defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
+	var responseBody []byte
+	if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
+		gr, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		defer gr.Close()
+		responseBody, err = io.ReadAll(gr)
+	} else {
+		responseBody, err = io.ReadAll(resp.Body)
+	}
+
 	if err != nil {
 		log.Error(err)
 		return

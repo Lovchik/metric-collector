@@ -21,6 +21,9 @@ autotests-6:
 autotests-7:
 	@echo Running autotests
 	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration7$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=.
+autotests-8:
+	@echo Running autotests
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration8$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=.
 build-app:
 	@echo Build app
 	go build -o cmd/metrics/agent cmd/agent/main.go

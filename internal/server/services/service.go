@@ -1,12 +1,16 @@
 package services
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"metric-collector/internal/server/metric"
 	"metric-collector/internal/server/storage"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type Service struct {
@@ -64,7 +68,28 @@ func (s *Service) UpdateMetricViaJSON(ctx *gin.Context) {
 			metrics.Delta = &v
 		}
 	}
-	ctx.JSON(http.StatusOK, metrics)
+	responseData, err := json.Marshal(metrics)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, nil)
+		return
+	}
+
+	if strings.Contains(ctx.GetHeader("Accept-Encoding"), "gzip") {
+		ctx.Header("Content-Encoding", "gzip")
+		ctx.Header("Content-Type", "application/json")
+		ctx.Header("Content-Type", "text/html")
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		_, err := gz.Write(responseData)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, nil)
+			return
+		}
+		gz.Close()
+		ctx.Data(http.StatusOK, "application/json", buf.Bytes())
+	} else {
+		ctx.JSON(http.StatusOK, metrics)
+	}
 }
 
 func validateMetricsToUpdateViaJSON(ctx *gin.Context, metrics metric.Metrics) {
@@ -143,13 +168,39 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 		metrics.Value = &gaugeValue
 
 	}
+	ctx.Header("Content-Type", "text/html")
+	ctx.Header("Content-Type", "application/json")
 	ctx.JSON(http.StatusOK, metrics)
 
 }
-
 func (s *Service) GetAllMetrics(context *gin.Context) {
-	all := s.Store.GetAll()
+	all := s.Store
+
+	// Проверяем заголовок Accept-Encoding
+	acceptEncoding := context.GetHeader("Accept-Encoding")
+	accept := context.GetHeader("Accept")
+
+	if accept == "text/html" {
+		context.Header("Content-Type", "text/html")
+	}
+
+	if acceptEncoding == "gzip" {
+		context.Header("Content-Encoding", "gzip")
+		writer := gzip.NewWriter(context.Writer)
+		defer writer.Close()
+		context.Writer = &gzipResponseWriter{Writer: writer, ResponseWriter: context.Writer}
+	}
+
 	context.JSON(http.StatusOK, all)
+}
+
+type gzipResponseWriter struct {
+	gin.ResponseWriter
+	Writer *gzip.Writer
+}
+
+func (g *gzipResponseWriter) Write(data []byte) (int, error) {
+	return g.Writer.Write(data)
 }
 
 func (s *Service) GetGauge(c *gin.Context) {
