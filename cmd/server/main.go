@@ -23,7 +23,7 @@ func Serve() {
 	if config.GetConfig().Restore {
 		err := s.Store.LoadMetricsInMemory(config.GetConfig().FileStoragePath)
 		if err != nil {
-			log.Error("Error loading metrics: %v", err)
+			log.Error("Error loading metrics: ", err)
 		}
 	}
 	go func() {

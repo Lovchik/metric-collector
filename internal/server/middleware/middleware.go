@@ -45,7 +45,7 @@ type responseWriter struct {
 }
 
 func (w *responseWriter) Write(b []byte) (int, error) {
-	w.body.Write(b) // Записываем в буфер
+	w.body.Write(b)
 	return w.ResponseWriter.Write(b)
 }
 
@@ -54,7 +54,6 @@ func GzipMiddleware() gin.HandlerFunc {
 		ow := c.Writer
 		contentType := c.ContentType()
 
-		// Проверяем поддержку gzip у клиента
 		if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") &&
 			(contentType == "application/json" || contentType == "text/html") {
 			gw := gzip.NewWriter(ow)
@@ -63,7 +62,6 @@ func GzipMiddleware() gin.HandlerFunc {
 			c.Header("Content-Encoding", "gzip")
 		}
 
-		// Проверяем, отправил ли клиент сжатые данные
 		if strings.Contains(c.GetHeader("Content-Encoding"), "gzip") {
 			gr, err := gzip.NewReader(c.Request.Body)
 			if err != nil {

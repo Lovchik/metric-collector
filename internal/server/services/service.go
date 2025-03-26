@@ -176,7 +176,6 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 func (s *Service) GetAllMetrics(context *gin.Context) {
 	all := s.Store
 
-	// Проверяем заголовок Accept-Encoding
 	acceptEncoding := context.GetHeader("Accept-Encoding")
 	accept := context.GetHeader("Accept")
 
