@@ -1,6 +1,7 @@
 autotests-1:
 	@echo Running autotests
 	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration1$ -source-path=. -binary-path=cmd/metrics/server
+
 autotests-2:
 	@echo Running autotests
 	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration2A$ -source-path=. -agent-binary-path=cmd/metrics/agent
@@ -15,10 +16,27 @@ autotests-4:
 autotests-5:
 	@echo Running autotests
 	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration5$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8081 -source-path=.
-build:
-	@echo Build App
+autotests-6:
+	@echo Running autotests
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration6$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8081 -source-path=.
+autotests-7:
+	@echo Running autotests
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration7$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=.
+autotests-8:
+	@echo Running autotests
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration8$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=.
+autotests-9:
+	@echo Running autotests
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration9$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=. -file-storage-path=file.txt
+build-app:
+	@echo Build app
+	go build -o cmd/metrics/agent cmd/agent/main.go
 	go build -o cmd/metrics/server cmd/server/main.go
 
-build-agent:
-	@echo Build agent
-	go build -o cmd/metrics/agent cmd/agent/main.go
+start-agent:
+	@echo Start agent
+	./cmd/metrics/agent
+
+start-server:
+	@echo Start server
+	./cmd/metrics/server

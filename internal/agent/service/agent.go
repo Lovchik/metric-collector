@@ -1,15 +1,20 @@
 package service
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"github.com/dranikpg/dto-mapper"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"math/rand"
 	"metric-collector/internal/agent/config"
 	"metric-collector/internal/agent/metric"
 	"net/http"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,14 +36,12 @@ func (a *Agent) Start() {
 		defer wg.Done()
 		for range poller.C {
 			a.updateMemStats()
-			log.Info("Update MemStats")
+			log.Info("UpdateMetric MemStats")
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		client := &http.Client{}
-		a.StatsMu.Lock()
-		defer a.StatsMu.Unlock()
 		for range reporter.C {
 			v := reflect.ValueOf(a.Stats)
 			t := reflect.TypeOf(a.Stats)
@@ -46,15 +49,25 @@ func (a *Agent) Start() {
 			for i := 0; i < v.NumField(); i++ {
 				field := t.Field(i)
 				value := v.Field(i)
+				metricToUpload := metric.MetricsToUpload{
+					ID: field.Name,
+				}
 
 				switch field.Type.Kind() {
 				case reflect.Int64, reflect.Int32:
-					sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update/", field.Name, "counter", value.Int(), client)
+					metricToUpload.MType = "counter"
+					metricToUpload.Delta = new(int64)
+					i2 := value.Int()
+					metricToUpload.Delta = &i2
+
 				case reflect.Float64:
-					sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update/", "gauge", field.Name, value.Float(), client)
+					metricToUpload.MType = "gauge"
+					metricToUpload.Value = new(float64)
+					*metricToUpload.Value = value.Float()
 				default:
 					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
 				}
+				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", metricToUpload, client)
 
 			}
 		}
@@ -67,43 +80,67 @@ func (a *Agent) Start() {
 func (a *Agent) updateMemStats() {
 	var runtimeStats runtime.MemStats
 	runtime.ReadMemStats(&runtimeStats)
-	a.StatsMu.Lock()
-	defer a.StatsMu.Unlock()
 	err := dto.Map(&a.Stats, runtimeStats)
 	if err != nil {
 		log.Fatal(err)
 	}
 	a.Stats.PollCount = a.Stats.PollCount + 1
+	a.Stats.RandomValue = rand.Float64()
 }
 
-func sendHTTPRequest(baseURL, nameValue string, typeValue string, value interface{}, client *http.Client) {
-	var stringValue string
-	switch v := value.(type) {
-	case float64:
-		stringValue = fmt.Sprintf("%.2f", v)
-	case int64:
-		stringValue = fmt.Sprintf("%d", v)
-	}
-
-	url := baseURL + typeValue + "/" + nameValue + "/" + stringValue
-	req, err := http.NewRequest("POST", url, nil)
-	if err != nil {
-		log.Error(err)
-	}
-
-	req.Header.Set("Content-Type", "text/plain")
-
-	resp, err := client.Do(req)
+func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, client *http.Client) {
+	jsonData, err := json.Marshal(metricToUpload)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, err = gz.Write(jsonData)
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	log.Info("Response Status: ", resp.Status, " Response Body: ", responseBody)
-	log.Info(url)
+	gz.Close()
+
+	req, err := http.NewRequest("POST", baseURL, &buf)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	var responseBody []byte
+	if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
+		gr, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		defer gr.Close()
+		responseBody, err = io.ReadAll(gr)
+		if err != nil {
+			log.Error(err)
+		}
+	} else {
+		responseBody, err = io.ReadAll(resp.Body)
+	}
+
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	log.Info("Response Status: ", resp.Status, " Response Body: ", string(responseBody))
+	log.Info(baseURL)
 }
