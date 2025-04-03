@@ -36,7 +36,7 @@ func (a *Agent) Start() {
 		defer wg.Done()
 		for range poller.C {
 			a.updateMemStats()
-			log.Info("Update MemStats")
+			log.Info("UpdateMetric MemStats")
 		}
 	}()
 	go func() {

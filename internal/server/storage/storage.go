@@ -21,13 +21,15 @@ type Storage interface {
 	SetMetric(name string, value any)
 	GetMetricValueByName(name string) (any, bool)
 	GetAllMetrics() map[string]any
-	UpdateMetric()
+	UpdateMetric(metric.Metric) (metric.Metric, error)
+	LoadMetricsInMemory(string) error
+	SaveMemoryInfo(string) error
 }
 
-func (m *MemStorage) Set(name string, value any) {
+func (m *MemStorage) SetMetric(name string, value any) {
 	m.metrics[name] = value
 }
-func (m *MemStorage) GetValueByName(name string) (any, bool) {
+func (m *MemStorage) GetMetricValueByName(name string) (any, bool) {
 	v, ok := m.metrics[name]
 	return v, ok
 }
@@ -36,31 +38,31 @@ type MemStorage struct {
 	metrics map[string]any
 }
 
-func (m *MemStorage) GetAll() map[string]any {
+func (m *MemStorage) GetAllMetrics() map[string]any {
 	return m.metrics
 }
 
-func (m *MemStorage) Update(metr metric.Metric) (metric.Metric, error) {
+func (m *MemStorage) UpdateMetric(metr metric.Metric) (metric.Metric, error) {
 	if counter, ok := metr.(metric.Counter); ok {
-		lastValue, ok := m.GetValueByName(counter.GetName())
+		lastValue, ok := m.GetMetricValueByName(counter.GetName())
 		if !ok {
 			value := counter.GetValue().(int64)
-			m.Set(counter.GetName(), value)
+			m.SetMetric(counter.GetName(), value)
 			return counter, nil
 		}
 		lastInt, ok := lastValue.(int64)
 		if !ok {
-			return nil, errors.New("last value is not a float64")
+			return nil, errors.New("last value is not a ubt64")
 		}
 
 		value := lastInt + (counter.GetValue().(int64))
-		m.Set(counter.GetName(), value)
+		m.SetMetric(counter.GetName(), value)
 		counter.Value = value
 		return counter, nil
 	}
 
 	if gauge, ok := metr.(metric.Gauge); ok {
-		m.Set(gauge.GetName(), gauge.GetValue().(float64))
+		m.SetMetric(gauge.GetName(), gauge.GetValue().(float64))
 		return gauge, nil
 	}
 
@@ -68,10 +70,15 @@ func (m *MemStorage) Update(metr metric.Metric) (metric.Metric, error) {
 }
 
 func (m *MemStorage) SaveMemoryInfo(filename string) error {
-	all := m.GetAll()
+	all := m.GetAllMetrics()
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
 	for name, value := range all {
-		err := saveMapEntryToFile(filename, name, value)
+		err := saveMapEntryToFile(file, name, value)
 		if err != nil {
 			log.Error(err)
 			return err
@@ -81,13 +88,7 @@ func (m *MemStorage) SaveMemoryInfo(filename string) error {
 
 }
 
-func saveMapEntryToFile(filename, key string, value interface{}) error {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
+func saveMapEntryToFile(file *os.File, key string, value interface{}) error {
 	existingData := make(map[string]string)
 	scanner := bufio.NewScanner(file)
 
@@ -168,13 +169,13 @@ func (m *MemStorage) LoadMetricsInMemory(filename string) error {
 		return err
 	}
 	for _, metr := range metrics {
-		update, err := m.Update(metr)
+		update, err := m.UpdateMetric(metr)
 		log.Info(update)
 		if err != nil {
 			return err
 		}
 	}
-	all := m.GetAll()
+	all := m.GetAllMetrics()
 	log.Info(all)
 	return nil
 

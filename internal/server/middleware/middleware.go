@@ -20,7 +20,11 @@ func LoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
 
-		bodyBytes, _ := io.ReadAll(c.Request.Body)
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 		responseBody := &bytes.Buffer{}

@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	log "github.com/sirupsen/logrus"
 	"metric-collector/internal/server/metric"
 	"net/http"
 	"net/http/httptest"
@@ -69,7 +70,10 @@ func TestValidateMetricsToUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := gin.Default()
 			r.POST("/update", func(ctx *gin.Context) {
-				validateMetricsToUpdateViaJSON(ctx, tt.metrics)
+				err := validateMetricsToUpdateViaJSON(ctx, tt.metrics)
+				if err != nil {
+					log.Error(err)
+				}
 				ctx.Status(http.StatusOK)
 			})
 

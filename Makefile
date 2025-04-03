@@ -1,6 +1,7 @@
 autotests-1:
 	@echo Running autotests
 	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration1$ -source-path=. -binary-path=cmd/metrics/server
+
 autotests-2:
 	@echo Running autotests
 	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration2A$ -source-path=. -agent-binary-path=cmd/metrics/agent

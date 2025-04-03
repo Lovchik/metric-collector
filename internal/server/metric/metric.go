@@ -63,20 +63,30 @@ type Metrics struct {
 }
 
 func NewMetric(metricName, metricType, metricValue string) (Metric, error) {
-	if metricType == "gauge" {
-		value, err := strconv.ParseFloat(metricValue, 64)
-		if err != nil {
-			log.Error(err)
-			return nil, err
 
+	switch metricType {
+	case "gauge":
+		{
+			value, err := strconv.ParseFloat(metricValue, 64)
+			if err != nil {
+				log.Error(err)
+				return nil, err
+
+			}
+			return Gauge{metricName, value}, nil
 		}
-		return Gauge{metricName, value}, nil
-	} else {
-		value, err := strconv.ParseInt(metricValue, 0, 64)
-		if err != nil {
-			log.Error(err)
-			return nil, err
+	case "counter":
+		{
+			value, err := strconv.ParseInt(metricValue, 0, 64)
+			if err != nil {
+				log.Error(err)
+				return nil, err
+			}
+			return Counter{metricName, value}, nil
 		}
-		return Counter{metricName, value}, nil
+	default:
+		{
+			return nil, errors.New("invalid metric type")
+		}
 	}
 }

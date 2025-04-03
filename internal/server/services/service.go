@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"metric-collector/internal/server/metric"
@@ -28,9 +29,10 @@ func (s *Service) UpdateMetric(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	metr, err := s.Store.Update(newMetric)
-	log.Info(metr)
+	metr, err := s.Store.UpdateMetric(newMetric)
+
 	if err != nil {
+		log.Error("Error :", err, "with value of newMetric :", newMetric, "got :", metr)
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 
@@ -45,13 +47,15 @@ func (s *Service) UpdateMetricViaJSON(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, nil)
 		return
 	}
-	validateMetricsToUpdateViaJSON(ctx, metrics)
+	if err := validateMetricsToUpdateViaJSON(ctx, metrics); err != nil {
+		return
+	}
 	newMetric, err := metric.NewMetricFromJSON(metrics)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, nil)
 		return
 	}
-	newMetric, err = s.Store.Update(newMetric)
+	newMetric, err = s.Store.UpdateMetric(newMetric)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, nil)
 		return
@@ -92,29 +96,30 @@ func (s *Service) UpdateMetricViaJSON(ctx *gin.Context) {
 	}
 }
 
-func validateMetricsToUpdateViaJSON(ctx *gin.Context, metrics metric.Metrics) {
+func validateMetricsToUpdateViaJSON(ctx *gin.Context, metrics metric.Metrics) error {
 	if validateType(ctx, metrics) {
-		return
+		return errors.New("metrics type is not supported")
 	}
 
 	if metrics.ID == "" || (metrics.Value == nil && metrics.Delta == nil) {
 		ctx.JSON(http.StatusNotFound, nil)
-		return
-
+		return errors.New("metrics not found")
 	}
 	if metrics.MType == "gauge" {
 
 		if metrics.Value == nil {
 			ctx.JSON(http.StatusBadRequest, nil)
-			return
+			return errors.New("metrics value is nil")
 		}
 
 	} else {
 		if metrics.Delta == nil {
 			ctx.JSON(http.StatusBadRequest, nil)
-			return
+			return errors.New("metrics delta is nil")
 		}
 	}
+
+	return nil
 }
 
 func validateType(ctx *gin.Context, metrics metric.Metrics) bool {
@@ -140,7 +145,7 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 		ctx.JSON(http.StatusNotFound, nil)
 		return
 	}
-	value, exists := s.Store.GetValueByName(metrics.ID)
+	value, exists := s.Store.GetMetricValueByName(metrics.ID)
 	if !exists {
 		ctx.JSON(http.StatusNotFound, nil)
 		return
@@ -208,7 +213,7 @@ func (s *Service) GetGauge(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	value, exists := s.Store.GetValueByName(name)
+	value, exists := s.Store.GetMetricValueByName(name)
 	if !exists {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -222,7 +227,7 @@ func (s *Service) GetCounter(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	value, exists := s.Store.GetValueByName(name)
+	value, exists := s.Store.GetMetricValueByName(name)
 	if !exists {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
