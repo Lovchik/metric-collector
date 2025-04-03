@@ -80,7 +80,6 @@ func (s *Service) UpdateMetricViaJSON(ctx *gin.Context) {
 
 	if strings.Contains(ctx.GetHeader("Accept-Encoding"), "gzip") {
 		ctx.Header("Content-Encoding", "gzip")
-		ctx.Header("Content-Type", "application/json")
 		ctx.Header("Content-Type", "text/html")
 		var buf bytes.Buffer
 		gz := gzip.NewWriter(&buf)
@@ -179,7 +178,7 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 
 }
 func (s *Service) GetAllMetrics(context *gin.Context) {
-	all := s.Store
+	all := s.Store.GetAllMetrics()
 
 	acceptEncoding := context.GetHeader("Accept-Encoding")
 	accept := context.GetHeader("Accept")

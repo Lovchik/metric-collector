@@ -71,27 +71,26 @@ func (m *MemStorage) UpdateMetric(metr metric.Metric) (metric.Metric, error) {
 
 func (m *MemStorage) SaveMemoryInfo(filename string) error {
 	all := m.GetAllMetrics()
+
+	err := saveMapEntryToFile(filename, all)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	return nil
+
+}
+
+func saveMapEntryToFile(filename string, data map[string]any) error {
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	for name, value := range all {
-		err := saveMapEntryToFile(file, name, value)
-		if err != nil {
-			log.Error(err)
-			return err
-		}
-	}
-	return nil
-
-}
-
-func saveMapEntryToFile(file *os.File, key string, value interface{}) error {
 	existingData := make(map[string]string)
 	scanner := bufio.NewScanner(file)
-
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.SplitN(line, "=", 2)
@@ -99,24 +98,24 @@ func saveMapEntryToFile(file *os.File, key string, value interface{}) error {
 			existingData[parts[0]] = parts[1]
 		}
 	}
-
 	if err := scanner.Err(); err != nil {
 		return err
 	}
 
-	var valueStr string
-	switch v := value.(type) {
-	case int64:
-		valueStr = strconv.FormatInt(v, 10)
-	case float64:
-		valueStr = strconv.FormatFloat(v, 'f', -1, 64)
-	case string:
-		valueStr = v
-	default:
-		return fmt.Errorf("unsupported value type")
+	for key, value := range data {
+		var valueStr string
+		switch v := value.(type) {
+		case int, int64:
+			valueStr = fmt.Sprintf("%d", v)
+		case float64:
+			valueStr = strconv.FormatFloat(v, 'f', -1, 64)
+		case string:
+			valueStr = v
+		default:
+			return fmt.Errorf("unsupported value type for key %s", key)
+		}
+		existingData[key] = valueStr
 	}
-
-	existingData[key] = valueStr
 
 	file.Seek(0, 0)
 	file.Truncate(0)
