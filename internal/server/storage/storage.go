@@ -129,7 +129,7 @@ func saveMapEntryToFile(filename string, data map[string]any) error {
 }
 
 func getMetricsFromFile(filename string) ([]metric.Metric, error) {
-	file, err := os.Open(filename)
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}

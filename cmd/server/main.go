@@ -24,7 +24,7 @@ func Serve() {
 		err := s.Store.LoadMetricsInMemory(config.GetConfig().FileStoragePath)
 		if err != nil {
 			log.Error("Error loading metrics: ", err)
-			return
+
 		}
 	}
 	go func() {
@@ -35,7 +35,6 @@ func Serve() {
 			err := s.Store.SaveMemoryInfo(config.GetConfig().FileStoragePath)
 			if err != nil {
 				log.Error(err)
-				return
 			}
 		}
 	}()
