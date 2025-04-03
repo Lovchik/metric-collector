@@ -25,7 +25,7 @@ func InitConfig() {
 	getEnv("ADDRESS", "a", ":8080", "Server address", &config.FlagRunAddr)
 	getEnvInt("STORE_INTERVAL", "i", 300, "Report interval", &config.StoreInterval)
 	getEnv("FILE_STORAGE_PATH", "f", "file.txt", "file storage path ", &config.FileStoragePath)
-	getEnvBool("RESTORE", "p", true, "Poll interval", &config.Restore)
+	getEnvBool("RESTORE", "p", false, "Poll interval", &config.Restore)
 	flag.Parse()
 
 	appConfig = config
