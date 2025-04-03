@@ -272,5 +272,4 @@ func (s *Service) HealthCheck(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, nil)
-	return
 }
