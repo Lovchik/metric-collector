@@ -8,7 +8,7 @@ import (
 )
 
 func HealthCheck() error {
-	conn, err := pgx.Connect(context.Background(), config.GetConfig().DatabaseDns)
+	conn, err := pgx.Connect(context.Background(), config.GetConfig().DatabaseDNS)
 	if err != nil {
 		log.Error("Failed connection to database", err)
 		return err
