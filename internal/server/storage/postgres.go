@@ -20,7 +20,7 @@ func (p PostgresStorage) SetMetric(metric metric.Metrics) error {
 		return err
 	}
 	exec, err := tx.Exec(context.Background(), "delete from metrics where id = $1 ", metric.ID)
-	log.Info("err", exec)
+	log.Info("exec ", exec)
 	if err != nil {
 		log.Error(err)
 		err := tx.Rollback(context.Background())
@@ -33,6 +33,11 @@ func (p PostgresStorage) SetMetric(metric metric.Metrics) error {
 	var id string
 	err = tx.QueryRow(context.Background(), "INSERT INTO metrics (id, type, value, delta) VALUES ($1,$2,$3,$4) RETURNING id", metric.ID, metric.MType, metric.Value, metric.Delta).Scan(&id)
 	if err != nil {
+		err = tx.Rollback(context.Background())
+		if err != nil {
+			log.Error(err)
+			return err
+		}
 		return err
 	}
 	return tx.Commit(context.Background())
@@ -57,14 +62,29 @@ func (p PostgresStorage) GetMetricValueByName(name string) (metric.Metrics, bool
 
 func (p PostgresStorage) GetAllMetrics() (map[string]metric.Metrics, error) {
 	var metricMap = make(map[string]metric.Metrics)
-	var metrics []metric.Metrics
-	err := p.Conn.QueryRow(context.Background(), "select * from metrics").Scan(&metrics)
+	rows, err := p.Conn.Query(context.Background(), "SELECT id, type, value, delta FROM metrics")
 	if err != nil {
-		log.Errorf("Error getting metrics: %v", err)
+		log.Error("Error querying metrics: ", err)
+		return metricMap, err
 	}
-	for _, m := range metrics {
+	defer rows.Close()
+
+	for rows.Next() {
+		var m metric.Metrics
+		err = rows.Scan(&m.ID, &m.MType, &m.Value, &m.Delta)
+		if err != nil {
+			log.Error("Error scanning row: ", err)
+			return metricMap, err
+		}
+
 		metricMap[m.ID] = m
 	}
+
+	if err = rows.Err(); err != nil {
+		log.Error("Error iterating over rows: ", err)
+		return metricMap, err
+	}
+
 	return metricMap, nil
 }
 
@@ -73,7 +93,8 @@ func (p PostgresStorage) UpdateMetric(metr metric.Metrics) (metric.Metrics, erro
 	case "counter":
 		{
 			var lastValue metric.Metrics
-			err := p.Conn.QueryRow(context.Background(), "SELECT  FROM metrics WHERE id = $1", metr.ID).Scan(&lastValue)
+
+			err := p.Conn.QueryRow(context.Background(), "SELECT * FROM metrics WHERE id = $1", metr.ID).Scan(&lastValue.ID, &lastValue.MType, &lastValue.Value, &lastValue.Delta)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					err := p.SetMetric(metr)
@@ -103,7 +124,7 @@ func (p PostgresStorage) UpdateMetric(metr metric.Metrics) (metric.Metrics, erro
 		}
 	default:
 		{
-			return metric.Metrics{}, errors.New("Invalid metric type ")
+			return metric.Metrics{}, errors.New("invalid metric type ")
 		}
 	}
 }
@@ -143,7 +164,7 @@ func (p PostgresStorage) SaveMemoryInfo(filename string) error {
 func HealthCheck() error {
 	conn, err := pgx.Connect(context.Background(), config.GetConfig().DatabaseDNS)
 	if err != nil {
-		log.Error("Failed connection to database", err)
+		log.Error("failed connection to database ", err)
 		return err
 	}
 	defer conn.Close(context.Background())
@@ -156,9 +177,8 @@ func NewPgStorage() (*PostgresStorage, error) {
 		log.Error("Unable to connect to database: ", err)
 		return nil, err
 	}
-	defer conn.Close(context.Background())
 
 	return &PostgresStorage{
-		conn,
+		Conn: conn,
 	}, nil
 }
