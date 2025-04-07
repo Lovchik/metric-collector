@@ -173,13 +173,16 @@ func HealthCheck() error {
 }
 
 func NewPgStorage(ctx context.Context) (*PostgresStorage, error) {
-	conn, err := pgxpool.New(ctx, config.GetConfig().DatabaseDNS)
+	pool, err := pgxpool.New(ctx, config.GetConfig().DatabaseDNS)
 	if err != nil {
 		log.Error("Unable to connect to database: ", err)
 		return nil, err
 	}
-
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		log.Error("Unable to ping database: ", err)
+	}
 	return &PostgresStorage{
-		Conn: conn,
+		Conn: pool,
 	}, nil
 }
