@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 )
@@ -29,7 +30,7 @@ func InitConfig() {
 	getEnv("DATABASE_DSN", "d", "", "file storage path ", &config.DatabaseDNS)
 	getEnvBool("RESTORE", "r", false, "Poll interval", &config.Restore)
 	flag.Parse()
-
+	log.Info("Config: ", config)
 	appConfig = config
 
 }
