@@ -28,7 +28,7 @@ func Serve() {
 		if err != nil {
 			return
 		}
-		ctx := context.Background()
+		ctx := context.WithoutCancel(context.Background())
 
 		pgStorage, err := storage.NewPgStorage(ctx)
 		if err != nil {
