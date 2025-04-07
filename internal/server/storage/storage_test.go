@@ -18,16 +18,21 @@ func TestMemStorage(t *testing.T) {
 	assert.Equal(t, 0, len(metrics))
 	firstValue := 90.5
 	secondValue := int64(2048)
-	storage.SetMetric(metric.Metrics{"cpu", "gauge", nil, &firstValue})
-	storage.SetMetric(metric.Metrics{"memory", "counter", &secondValue, nil})
-
+	err = storage.SetMetric(metric.Metrics{ID: "cpu", MType: "gauge", Value: &firstValue})
+	if err != nil {
+		log.Error(err)
+	}
+	err = storage.SetMetric(metric.Metrics{ID: "memory", MType: "counter", Delta: &secondValue})
+	if err != nil {
+		log.Error(err)
+	}
 	cpu, exists := storage.GetMetricValueByName("cpu")
 	assert.True(t, exists)
 	assert.Equal(t, 90.5, *cpu.Value)
 
 	memory, exists := storage.GetMetricValueByName("memory")
 	assert.True(t, exists)
-	assert.Equal(t, int64(2048), memory.Delta)
+	assert.Equal(t, int64(2048), *memory.Delta)
 
 	allMetrics, err := storage.GetAllMetrics()
 	if err != nil {
