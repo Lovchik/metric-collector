@@ -7,16 +7,30 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
 	"metric-collector/internal/server/storage"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Service struct {
 	WebServer *gin.Engine
-	Store     *storage.MemStorage
+	Store     storage.Storage
+}
+
+func (s *Service) SaveMetricsToMemory() {
+	for {
+		if config.GetConfig().StoreInterval > 0 {
+			time.Sleep(time.Duration(config.GetConfig().StoreInterval) * time.Second)
+		}
+		err := s.Store.SaveMemoryInfo(config.GetConfig().FileStoragePath)
+		if err != nil {
+			log.Error(err)
+		}
+	}
 }
 
 func (s *Service) UpdateMetric(c *gin.Context) {
@@ -29,10 +43,10 @@ func (s *Service) UpdateMetric(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	metr, err := s.Store.UpdateMetric(newMetric)
+	newMetric, err = s.Store.UpdateMetric(newMetric)
 
 	if err != nil {
-		log.Error("Error :", err, "with value of newMetric :", newMetric, "got :", metr)
+		log.Error("Error :", err, "with value of newMetric :", newMetric)
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 
@@ -50,27 +64,12 @@ func (s *Service) UpdateMetricViaJSON(ctx *gin.Context) {
 	if err := validateMetricsToUpdateViaJSON(ctx, metrics); err != nil {
 		return
 	}
-	newMetric, err := metric.NewMetricFromJSON(metrics)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, nil)
-		return
-	}
-	newMetric, err = s.Store.UpdateMetric(newMetric)
+
+	metrics, err := s.Store.UpdateMetric(metrics)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, nil)
 		return
 
-	}
-	value := newMetric.GetValue()
-
-	if metrics.MType == "gauge" {
-		if v, ok := value.(float64); ok {
-			metrics.Value = &v
-		}
-	} else {
-		if v, ok := value.(int64); ok {
-			metrics.Delta = &v
-		}
 	}
 	responseData, err := json.Marshal(metrics)
 	if err != nil {
@@ -149,36 +148,18 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 		ctx.JSON(http.StatusNotFound, nil)
 		return
 	}
-	if metrics.MType == "counter" {
-		metrics.Delta = new(int64)
-		log.Info("metric counter value: ", value)
-		counterValue, ok := value.(int64)
-		if !ok {
-			ctx.JSON(http.StatusNotFound, nil)
-			return
-		}
-		metrics.Delta = &counterValue
-
-	}
-	if metrics.MType == "gauge" {
-		metrics.Value = new(float64)
-		log.Info("metric gauge value: ", value)
-
-		gaugeValue, ok := value.(float64)
-		if !ok {
-			ctx.JSON(http.StatusNotFound, nil)
-			return
-		}
-		metrics.Value = &gaugeValue
-
-	}
 	ctx.Header("Content-Type", "text/html")
 	ctx.Header("Content-Type", "application/json")
-	ctx.JSON(http.StatusOK, metrics)
+	ctx.JSON(http.StatusOK, value)
 
 }
 func (s *Service) GetAllMetrics(context *gin.Context) {
-	all := s.Store.GetAllMetrics()
+	all, err := s.Store.GetAllMetrics()
+	if err != nil {
+		log.Error(err)
+		context.JSON(http.StatusInternalServerError, nil)
+		return
+	}
 
 	acceptEncoding := context.GetHeader("Accept-Encoding")
 	accept := context.GetHeader("Accept")
@@ -217,7 +198,7 @@ func (s *Service) GetGauge(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	c.JSON(http.StatusOK, value)
+	c.JSON(http.StatusOK, value.Value)
 }
 
 func (s *Service) GetCounter(c *gin.Context) {
@@ -232,7 +213,7 @@ func (s *Service) GetCounter(c *gin.Context) {
 		return
 	}
 	log.Info(value)
-	c.JSON(http.StatusOK, value)
+	c.JSON(http.StatusOK, value.Delta)
 
 }
 

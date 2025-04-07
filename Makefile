@@ -27,10 +27,15 @@ autotests-8:
 	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration8$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=.
 autotests-9:
 	@echo Running autotests
-	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration9$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=. -file-storage-path=file.txt
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration9$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=. -file-storage-path=file.json
 autotests-10:
 	@echo Running autotests
-	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration10$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=. -file-storage-path=file.txt -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable'
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration10A$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=. -file-storage-path=file.json -database-dsn='postgresql://localhost:postgres@postgres:5002/praktikum?sslmode=disable'
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration10B$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=. -file-storage-path=file.json -database-dsn='postgresql://localhost:postgres@postgres:5002/praktikum?sslmode=disable'
+autotests-11:
+	@echo Running autotests
+	@metricstest-darwin-arm64 -test.v -test.run=^TestIteration11$ -agent-binary-path=cmd/metrics/agent -binary-path=cmd/metrics/server -server-port=8080 -source-path=. -file-storage-path=file.json -database-dsn='postgresql://localhost:postgres@postgres:5002/praktikum?sslmode=disable'
+
 build-app:
 	@echo Build app
 	go build -o cmd/metrics/agent cmd/agent/main.go

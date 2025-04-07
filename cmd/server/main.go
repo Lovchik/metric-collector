@@ -8,7 +8,7 @@ import (
 	"metric-collector/internal/server/handlers"
 	"metric-collector/internal/server/services"
 	"metric-collector/internal/server/storage"
-	"time"
+	"metric-collector/internal/utils/migrations"
 )
 
 func main() {
@@ -19,7 +19,21 @@ func main() {
 func Serve() {
 	s := &services.Service{}
 	s.WebServer = gin.Default()
-	s.Store = storage.NewMemStorage()
+
+	if config.GetConfig().DatabaseDNS == "" {
+		s.Store = storage.NewMemStorage()
+	} else {
+		err := migrations.StartMigrations()
+		if err != nil {
+			return
+		}
+		pgStorage, err := storage.NewPgStorage()
+		if err != nil {
+			return
+		}
+		s.Store = pgStorage
+	}
+
 	if config.GetConfig().Restore {
 		err := s.Store.LoadMetricsInMemory(config.GetConfig().FileStoragePath)
 		if err != nil {
@@ -27,17 +41,7 @@ func Serve() {
 
 		}
 	}
-	go func() {
-		for {
-			if config.GetConfig().StoreInterval > 0 {
-				time.Sleep(time.Duration(config.GetConfig().StoreInterval) * time.Second)
-			}
-			err := s.Store.SaveMemoryInfo(config.GetConfig().FileStoragePath)
-			if err != nil {
-				log.Error(err)
-			}
-		}
-	}()
+	go s.SaveMetricsToMemory()
 	ginConfig := cors.DefaultConfig()
 	ginConfig.AllowAllOrigins = true
 	s.WebServer.Use(cors.New(ginConfig))
