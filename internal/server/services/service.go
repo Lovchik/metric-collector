@@ -254,3 +254,45 @@ func (s *Service) HealthCheck(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, nil)
 }
+
+func (s *Service) UpdateMetrics(ctx *gin.Context) {
+	var metrics []metric.Metrics
+
+	if err := ctx.ShouldBindJSON(&metrics); err != nil {
+		ctx.JSON(http.StatusBadRequest, nil)
+		return
+	}
+	for _, mtrc := range metrics {
+		if err := validateMetricsToUpdateViaJSON(ctx, mtrc); err != nil {
+			return
+		}
+	}
+	metrics, err := s.Store.UpdateMetrics(metrics)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, nil)
+		return
+
+	}
+	responseData, err := json.Marshal(metrics)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, nil)
+		return
+	}
+
+	if strings.Contains(ctx.GetHeader("Accept-Encoding"), "gzip") {
+		ctx.Header("Content-Encoding", "gzip")
+		ctx.Header("Content-Type", "text/html")
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		_, err := gz.Write(responseData)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, nil)
+			return
+		}
+		gz.Close()
+		ctx.Data(http.StatusOK, "application/json", buf.Bytes())
+	} else {
+		ctx.JSON(http.StatusOK, metrics)
+	}
+
+}

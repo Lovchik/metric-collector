@@ -22,6 +22,7 @@ type Storage interface {
 	UpdateMetric(metric.Metrics) (metric.Metrics, error)
 	LoadMetricsInMemory(string) error
 	SaveMemoryInfo(string) error
+	UpdateMetrics([]metric.Metrics) ([]metric.Metrics, error)
 }
 
 func (m *MemStorage) SetMetric(metric metric.Metrics) error {
@@ -145,4 +146,31 @@ func (m *MemStorage) LoadMetricsInMemory(filename string) error {
 		}
 	}
 	return nil
+}
+
+func (m *MemStorage) UpdateMetrics(metrics []metric.Metrics) ([]metric.Metrics, error) {
+	if m.metrics == nil {
+		m.metrics = make(map[string]metric.Metrics)
+	}
+
+	for _, newMetric := range metrics {
+		existing, exists := m.metrics[newMetric.ID]
+
+		switch newMetric.MType {
+		case "counter":
+			if exists && existing.Delta != nil && newMetric.Delta != nil {
+				sum := *existing.Delta + *newMetric.Delta
+				existing.Delta = &sum
+				m.metrics[newMetric.ID] = existing
+			} else {
+				m.metrics[newMetric.ID] = newMetric
+			}
+		case "gauge":
+			m.metrics[newMetric.ID] = newMetric
+		default:
+			return nil, errors.New("unsupported metric type ")
+		}
+	}
+
+	return metrics, nil
 }

@@ -36,30 +36,29 @@ func InitConfig() {
 }
 
 func getEnv(envName, flagName, defaultValue, usage string, config *string) {
+	flag.StringVar(config, flagName, defaultValue, usage)
+
 	if value := os.Getenv(envName); value != "" {
 		*config = value
-	} else {
-		flag.StringVar(config, flagName, defaultValue, usage)
 	}
-
 }
 
 func getEnvInt(envName string, flagName string, defaultValue int64, usage string, config *int64) {
+	flag.Int64Var(config, flagName, defaultValue, usage)
+
 	if value := os.Getenv(envName); value != "" {
 		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
 			*config = parsed
 		}
-	} else {
-		flag.Int64Var(config, flagName, defaultValue, usage)
 	}
 }
 
 func getEnvBool(envName string, flagName string, defaultValue bool, usage string, config *bool) {
+	flag.BoolVar(config, flagName, defaultValue, usage)
+
 	if value := os.Getenv(envName); value != "" {
 		if parsed, err := strconv.ParseBool(value); err == nil {
 			*config = parsed
 		}
-	} else {
-		flag.BoolVar(config, flagName, defaultValue, usage)
 	}
 }

@@ -49,13 +49,16 @@ func (p PostgresStorage) GetMetricValueByName(name string) (metric.Metrics, bool
 	var count int64
 	err := p.Conn.QueryRow(context.Background(), "select count(metrics) from metrics where id = $1", name).Scan(&count)
 	if err != nil {
+		log.Error(err)
 		return metrics, false
 	}
 	if count == 0 {
+		log.Info("metrics not found")
 		return metrics, false
 	}
-	err = p.Conn.QueryRow(context.Background(), "select * from metrics where id = $1", name).Scan(&metrics)
+	err = p.Conn.QueryRow(context.Background(), "select * from metrics where id = $1", name).Scan(&metrics.ID, &metrics.MType, &metrics.Value, &metrics.Delta)
 	if err != nil {
+		log.Error(err)
 		return metrics, false
 	}
 	return metrics, true
@@ -182,7 +185,55 @@ func NewPgStorage(ctx context.Context) (*PostgresStorage, error) {
 		pool.Close()
 		log.Error("Unable to ping database: ", err)
 	}
+	log.Info("Successfully connected to database")
+
 	return &PostgresStorage{
 		Conn: pool,
 	}, nil
+}
+
+func (p PostgresStorage) UpdateMetrics(metrics []metric.Metrics) ([]metric.Metrics, error) {
+	tx, err := p.Conn.Begin(context.Background())
+	if err != nil {
+		log.Error("Error updating metrics: ", err)
+		return nil, err
+	}
+	defer tx.Rollback(context.Background())
+
+	for _, m := range metrics {
+		switch m.MType {
+		case "counter":
+			_, err := tx.Exec(context.Background(), `
+				INSERT INTO metrics (id, type, delta)
+				VALUES ($1, $2, $3)
+				ON CONFLICT (id) DO UPDATE 
+				SET delta = metrics.delta + EXCLUDED.delta
+			`, m.ID, m.MType, m.Delta)
+			if err != nil {
+				log.Error("Error updating metrics: ", err)
+				return nil, err
+			}
+		case "gauge":
+			_, err := tx.Exec(context.Background(), `
+				INSERT INTO metrics (id, type, value)
+				VALUES ($1, $2, $3)
+				ON CONFLICT (id) DO UPDATE 
+				SET value = EXCLUDED.value
+			`, m.ID, m.MType, m.Value)
+			if err != nil {
+				log.Error("Error updating metrics: ", err)
+				return nil, err
+			}
+		default:
+			return nil, errors.New("unsupported metric type")
+		}
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		log.Error("Error updating metrics: ", err)
+		return nil, err
+	}
+
+	return metrics, nil
 }
