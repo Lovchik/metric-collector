@@ -43,6 +43,7 @@ func (a *Agent) Start() {
 		defer wg.Done()
 		client := &http.Client{}
 		for range reporter.C {
+			var toUpload []metric.MetricsToUpload
 			v := reflect.ValueOf(a.Stats)
 			t := reflect.TypeOf(a.Stats)
 
@@ -67,8 +68,11 @@ func (a *Agent) Start() {
 				default:
 					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
 				}
-				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", metricToUpload, client)
+				toUpload = append(toUpload, metricToUpload)
 
+			}
+			if len(toUpload) > 0 {
+				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", toUpload, client)
 			}
 		}
 
@@ -88,7 +92,7 @@ func (a *Agent) updateMemStats() {
 	a.Stats.RandomValue = rand.Float64()
 }
 
-func sendHTTPRequest(baseURL string, metricToUpload metric.MetricsToUpload, client *http.Client) {
+func sendHTTPRequest(baseURL string, metricToUpload []metric.MetricsToUpload, client *http.Client) {
 	jsonData, err := json.Marshal(metricToUpload)
 	if err != nil {
 		log.Fatal(err)
