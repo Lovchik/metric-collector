@@ -68,11 +68,13 @@ func (a *Agent) Start() {
 				default:
 					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
 				}
+				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", metricToUpload, client)
+
 				toUpload = append(toUpload, metricToUpload)
 
 			}
 			if len(toUpload) > 0 {
-				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", toUpload, client)
+				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/updates", toUpload, client)
 			}
 		}
 
@@ -92,7 +94,7 @@ func (a *Agent) updateMemStats() {
 	a.Stats.RandomValue = rand.Float64()
 }
 
-func sendHTTPRequest(baseURL string, metricToUpload []metric.MetricsToUpload, client *http.Client) {
+func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Client) {
 	jsonData, err := json.Marshal(metricToUpload)
 	if err != nil {
 		log.Fatal(err)
