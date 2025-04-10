@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
+	"os"
 )
 
 type PostgresStorage struct {
@@ -231,6 +232,20 @@ func NewPgStorage(ctx context.Context, dataBaseDSN string) (*PostgresStorage, er
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close() // важно
 		return nil, fmt.Errorf("%s: %w", "Errorrrr!", err)
+	}
+	sqlFilePath := "./migrations/1743747535_metric_table.sql"
+
+	sqlBytes, err := os.ReadFile(sqlFilePath)
+	if err != nil {
+		log.Error("Failed to read SQL file: ", err)
+		return nil, err
+	}
+
+	sql := string(sqlBytes)
+	_, err = pool.Exec(ctx, sql)
+	if err != nil {
+		log.Error("Failed to execute SQL: ", err)
+		return nil, err
 	}
 
 	return &PostgresStorage{Conn: pool}, nil
