@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
 	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
 )
 
 type PostgresStorage struct {
-	Conn *pgxpool.Pool
+	Conn *pgx.Conn
 }
 
 func (p PostgresStorage) SetMetric(metric metric.Metrics) error {
@@ -176,19 +175,19 @@ func HealthCheck() error {
 }
 
 func NewPgStorage(ctx context.Context) (*PostgresStorage, error) {
-	pool, err := pgxpool.New(ctx, config.GetConfig().DatabaseDNS)
+	conn, err := pgx.Connect(ctx, config.GetConfig().DatabaseDNS)
 	if err != nil {
 		log.Error("Unable to connect to database: ", err)
 		return nil, err
 	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
+	if err := conn.Ping(ctx); err != nil {
+		conn.Close(context.Background())
 		log.Error("Unable to ping database: ", err)
 	}
 	log.Info("Successfully connected to database")
 
 	return &PostgresStorage{
-		Conn: pool,
+		Conn: conn,
 	}, nil
 }
 
