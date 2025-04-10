@@ -9,7 +9,6 @@ import (
 	"metric-collector/internal/server/handlers"
 	"metric-collector/internal/server/services"
 	"metric-collector/internal/server/storage"
-	"metric-collector/internal/utils/migrations"
 )
 
 func main() {
@@ -24,10 +23,10 @@ func Serve() {
 	if config.GetConfig().DatabaseDNS == "" {
 		s.Store = storage.NewMemStorage()
 	} else {
-		err := migrations.StartMigrations()
-		if err != nil {
-			return
-		}
+		//err := migrations.StartMigrations()
+		//if err != nil {
+		//	return
+		//}
 		ctx := context.WithoutCancel(context.Background())
 
 		pgStorage, err := storage.NewPgStorage(ctx)
