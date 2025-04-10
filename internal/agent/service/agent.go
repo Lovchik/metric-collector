@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"metric-collector/internal/agent/config"
 	"metric-collector/internal/agent/metric"
+	"metric-collector/internal/retry"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -68,13 +69,20 @@ func (a *Agent) Start() {
 				default:
 					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
 				}
-				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", metricToUpload, client)
+				err := sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", metricToUpload, client)
+				if err != nil {
+					log.Error(err)
+				}
 
 				toUpload = append(toUpload, metricToUpload)
 
 			}
 			if len(toUpload) > 0 {
-				sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/updates", toUpload, client)
+				err := sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", toUpload, client)
+				if err != nil {
+					log.Error(err)
+				}
+
 			}
 		}
 
@@ -94,7 +102,7 @@ func (a *Agent) updateMemStats() {
 	a.Stats.RandomValue = rand.Float64()
 }
 
-func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Client) {
+func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Client) error {
 	jsonData, err := json.Marshal(metricToUpload)
 	if err != nil {
 		log.Fatal(err)
@@ -105,24 +113,26 @@ func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Cl
 	_, err = gz.Write(jsonData)
 	if err != nil {
 		log.Error(err)
-		return
+		return err
 	}
 	gz.Close()
 
 	req, err := http.NewRequest("POST", baseURL, &buf)
 	if err != nil {
 		log.Error(err)
-		return
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
 
-	resp, err := client.Do(req)
+	resp, err := retry.Retry(3, 1, func() (*http.Response, error) {
+		return client.Do(req)
+	})
 	if err != nil {
 		log.Error(err)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -131,7 +141,7 @@ func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Cl
 		gr, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			log.Error(err)
-			return
+			return err
 		}
 		defer gr.Close()
 		responseBody, err = io.ReadAll(gr)
@@ -144,9 +154,10 @@ func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Cl
 
 	if err != nil {
 		log.Error(err)
-		return
+		return err
 	}
 
 	log.Info("Response Status: ", resp.Status, " Response Body: ", string(responseBody))
 	log.Info(baseURL)
+	return nil
 }

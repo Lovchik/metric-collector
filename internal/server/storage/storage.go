@@ -5,6 +5,7 @@ import (
 	"errors"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"metric-collector/internal/retry"
 	"metric-collector/internal/server/metric"
 	"os"
 )
@@ -112,15 +113,17 @@ func saveMapEntryToFile(filename string, data map[string]metric.Metrics) error {
 }
 
 func getMetricsFromFile(filename string) ([]metric.Metrics, error) {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
+	file, err := retry.Retry(3, 1, func() (*os.File, error) {
+		return os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
+	})
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
 
-	// map вместо []slice
 	var metricMap map[string]metric.Metrics
 	if err := decoder.Decode(&metricMap); err != nil {
 		if errors.Is(err, io.EOF) {
@@ -129,7 +132,6 @@ func getMetricsFromFile(filename string) ([]metric.Metrics, error) {
 		return nil, err
 	}
 
-	// Преобразуем map → slice
 	metrics := make([]metric.Metrics, 0, len(metricMap))
 	for _, m := range metricMap {
 		metrics = append(metrics, m)
