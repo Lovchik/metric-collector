@@ -222,8 +222,8 @@ type PostgresStorage struct {
 	Conn *pgxpool.Pool
 }
 
-func NewStorage(ctx context.Context, dataBaseDSN string) (*PostgresStorage, error) {
-	const op = "internal.repo.storage.postgres.NewStorage"
+func NewPgStorage(ctx context.Context, dataBaseDSN string) (*PostgresStorage, error) {
+	const op = "internal.repo.storage.postgres.NewPgStorage"
 
 	pool, err := pgxpool.New(ctx, dataBaseDSN)
 	if err != nil {
