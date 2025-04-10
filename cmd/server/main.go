@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -19,22 +18,23 @@ func main() {
 func Serve() {
 	s := &services.Service{}
 	s.WebServer = gin.Default()
+	s.Store = storage.NewMemStorage()
 
-	if config.GetConfig().DatabaseDNS == "" {
-		s.Store = storage.NewMemStorage()
-	} else {
-		//err := migrations.StartMigrations()
-		//if err != nil {
-		//	return
-		//}
-		ctx := context.WithoutCancel(context.Background())
-
-		pgStorage, err := storage.NewPgStorage(ctx, config.GetConfig().DatabaseDNS)
-		if err != nil {
-			return
-		}
-		s.Store = pgStorage
-	}
+	//if config.GetConfig().DatabaseDNS == "" {
+	//	s.Store = storage.NewMemStorage()
+	//} else {
+	//	//err := migrations.StartMigrations()
+	//	//if err != nil {
+	//	//	return
+	//	//}
+	//	ctx := context.WithoutCancel(context.Background())
+	//
+	//	pgStorage, err := storage.NewPgStorage(ctx, config.GetConfig().DatabaseDNS)
+	//	if err != nil {
+	//		return
+	//	}
+	//	s.Store = pgStorage
+	//}
 
 	if config.GetConfig().Restore {
 		err := s.Store.LoadMetricsInMemory(config.GetConfig().FileStoragePath)
