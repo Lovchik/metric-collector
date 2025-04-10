@@ -23,6 +23,11 @@ type Storage interface {
 	LoadMetricsInMemory(string) error
 	SaveMemoryInfo(string) error
 	UpdateMetrics([]metric.Metrics) ([]metric.Metrics, error)
+	HealthCheck() (err error)
+}
+
+func (m *MemStorage) HealthCheck() error {
+	return nil
 }
 
 func (m *MemStorage) SetMetric(metric metric.Metrics) error {

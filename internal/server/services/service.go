@@ -247,7 +247,7 @@ func validateMetricsToUpdate(c *gin.Context) {
 }
 
 func (s *Service) HealthCheck(c *gin.Context) {
-	err := storage.HealthCheck()
+	err := s.Store.HealthCheck()
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return

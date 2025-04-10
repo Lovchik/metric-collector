@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
-	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
+	"time"
 )
 
 func (p PostgresStorage) SetMetric(metric metric.Metrics) error {
@@ -162,13 +162,14 @@ func (p PostgresStorage) SaveMemoryInfo(filename string) error {
 
 }
 
-func HealthCheck() error {
-	conn, err := pgx.Connect(context.Background(), config.GetConfig().DatabaseDNS)
-	if err != nil {
-		log.Error("failed connection to database ", err)
+func (p PostgresStorage) HealthCheck() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := p.Conn.Ping(ctx); err != nil {
+		log.Error(err)
 		return err
 	}
-	defer conn.Close(context.Background())
 	return nil
 }
 
