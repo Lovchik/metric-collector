@@ -228,6 +228,10 @@ func NewPgStorage(ctx context.Context, dataBaseDSN string) (*PostgresStorage, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pool, %w", err)
 	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close() // важно
+		return nil, fmt.Errorf("%s: %w", "Errorrrr!", err)
+	}
 
 	return &PostgresStorage{Conn: pool}, nil
 }
