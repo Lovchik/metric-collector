@@ -29,7 +29,7 @@ func Serve() {
 		//}
 		ctx := context.WithoutCancel(context.Background())
 
-		pgStorage, err := storage.NewPgStorage(ctx)
+		pgStorage, err := storage.NewPgStorage(ctx, config.GetConfig().DatabaseDNS)
 		if err != nil {
 			return
 		}

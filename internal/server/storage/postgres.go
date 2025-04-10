@@ -3,14 +3,16 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
 	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
 )
 
 type PostgresStorage struct {
-	Conn *pgx.Conn
+	Conn *pgxpool.Pool
 }
 
 func (p PostgresStorage) SetMetric(metric metric.Metrics) error {
@@ -174,23 +176,6 @@ func HealthCheck() error {
 	return nil
 }
 
-func NewPgStorage(ctx context.Context) (*PostgresStorage, error) {
-	conn, err := pgx.Connect(ctx, config.GetConfig().DatabaseDNS)
-	if err != nil {
-		log.Error("Unable to connect to database: ", err)
-		return nil, err
-	}
-	if err := conn.Ping(ctx); err != nil {
-		conn.Close(context.Background())
-		log.Error("Unable to ping database: ", err)
-	}
-	log.Info("Successfully connected to database")
-
-	return &PostgresStorage{
-		Conn: conn,
-	}, nil
-}
-
 func (p PostgresStorage) UpdateMetrics(metrics []metric.Metrics) ([]metric.Metrics, error) {
 	tx, err := p.Conn.Begin(context.Background())
 	if err != nil {
@@ -235,4 +220,14 @@ func (p PostgresStorage) UpdateMetrics(metrics []metric.Metrics) ([]metric.Metri
 	}
 
 	return metrics, nil
+}
+
+func NewPgStorage(ctx context.Context, dataBaseDSN string) (*PostgresStorage, error) {
+
+	pool, err := pgxpool.New(ctx, dataBaseDSN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pool, %w", err)
+	}
+
+	return &PostgresStorage{Conn: pool}, nil
 }
