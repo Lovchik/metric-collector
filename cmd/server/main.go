@@ -28,6 +28,7 @@ func Serve() {
 
 		pgStorage, err := storage.NewPgStorage(ctx, config.GetConfig().DatabaseDNS)
 		if err != nil {
+			log.Fatal(err)
 			return
 		}
 		s.Store = pgStorage
