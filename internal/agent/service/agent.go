@@ -41,12 +41,12 @@ func (a *Agent) Start() {
 			log.Info("UpdateMetric MemStats")
 		}
 	}()
-	updatesUrl := url2.URL{
+	updatesURL := url2.URL{
 		Scheme: "http",
 		Host:   config.GetConfig().FlagRunAddr,
 		Path:   "/updates",
 	}
-	updateUrl := url2.URL{
+	updateURL := url2.URL{
 		Scheme: "http",
 		Host:   config.GetConfig().FlagRunAddr,
 		Path:   "/update",
@@ -80,7 +80,7 @@ func (a *Agent) Start() {
 				default:
 					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
 				}
-				err := sendHTTPRequest(updateUrl.String(), metricToUpload, client)
+				err := sendHTTPRequest(updateURL.String(), metricToUpload, client)
 				if err != nil {
 					log.Error(err)
 					continue
@@ -90,7 +90,7 @@ func (a *Agent) Start() {
 
 			}
 			if len(toUpload) > 0 {
-				err := sendHTTPRequest(updatesUrl.String(), toUpload, client)
+				err := sendHTTPRequest(updatesURL.String(), toUpload, client)
 				if err != nil {
 					log.Error(err)
 					continue
