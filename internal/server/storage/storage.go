@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io"
 	"metric-collector/internal/retry"
+	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
 	"os"
 )
@@ -73,6 +74,12 @@ func (m *MemStorage) UpdateMetric(metr metric.Metrics) (metric.Metrics, error) {
 			return metric.Metrics{}, err
 		}
 		return metr, nil
+	}
+
+	if config.GetConfig().StoreInterval == 0 {
+		err := UpdateMetricInFile(metr)
+		log.Error(err)
+		return metric.Metrics{}, err
 	}
 
 	return metric.Metrics{}, errors.New("unknown metric type")
@@ -178,6 +185,45 @@ func (m *MemStorage) UpdateMetrics(metrics []metric.Metrics) ([]metric.Metrics, 
 			return nil, errors.New("unsupported metric type ")
 		}
 	}
+	if config.GetConfig().StoreInterval == 0 {
+		for _, m := range metrics {
+			err := UpdateMetricInFile(m)
+			log.Error(err)
+			return nil, err
+		}
+	}
 
 	return metrics, nil
+}
+
+func UpdateMetricInFile(metr metric.Metrics) error {
+	metrics, err := getMetricsFromFile(config.GetConfig().FileStoragePath)
+	if err != nil {
+		return err
+	}
+
+	metricMap := make(map[string]metric.Metrics)
+	for _, m := range metrics {
+		metricMap[m.ID] = m
+	}
+
+	metricMap[metr.ID] = metr
+
+	updatedMetrics := make([]metric.Metrics, 0, len(metricMap))
+	for _, m := range metricMap {
+		updatedMetrics = append(updatedMetrics, m)
+	}
+
+	file, err := os.OpenFile(config.GetConfig().FileStoragePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	if err := encoder.Encode(updatedMetrics); err != nil {
+		return err
+	}
+
+	return nil
 }

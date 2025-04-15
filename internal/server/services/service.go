@@ -23,9 +23,7 @@ type Service struct {
 
 func (s *Service) SaveMetricsToMemory() {
 	for {
-		if config.GetConfig().StoreInterval > 0 {
-			time.Sleep(time.Duration(config.GetConfig().StoreInterval) * time.Second)
-		}
+		time.Sleep(time.Duration(config.GetConfig().StoreInterval) * time.Second)
 		err := s.Store.SaveMemoryInfo(config.GetConfig().FileStoragePath)
 		if err != nil {
 			log.Error(err)

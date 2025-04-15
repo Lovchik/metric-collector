@@ -40,7 +40,9 @@ func Serve() {
 			log.Error("Error loading metrics: ", err)
 		}
 	}
-	go s.SaveMetricsToMemory()
+	if config.GetConfig().StoreInterval > 0 {
+		go s.SaveMetricsToMemory()
+	}
 	ginConfig := cors.DefaultConfig()
 	ginConfig.AllowAllOrigins = true
 	s.WebServer.Use(cors.New(ginConfig))

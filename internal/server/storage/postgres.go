@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
+	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
 	"time"
 )
@@ -93,6 +94,11 @@ func (p PostgresStorage) UpdateMetric(metr metric.Metrics) (metric.Metrics, erro
 			if err != nil {
 				return metric.Metrics{}, err
 			}
+			if config.GetConfig().StoreInterval == 0 {
+				err := UpdateMetricInFile(metr)
+				log.Error(err)
+				return metric.Metrics{}, err
+			}
 			return metr, nil
 		}
 	case "gauge":
@@ -101,13 +107,20 @@ func (p PostgresStorage) UpdateMetric(metr metric.Metrics) (metric.Metrics, erro
 			if err != nil {
 				return metric.Metrics{}, err
 			}
+			if config.GetConfig().StoreInterval == 0 {
+				err := UpdateMetricInFile(metr)
+				log.Error(err)
+				return metric.Metrics{}, err
+			}
 			return metr, nil
 		}
 	default:
 		{
 			return metric.Metrics{}, errors.New("invalid metric type ")
 		}
+
 	}
+
 }
 
 func (p PostgresStorage) LoadMetricsInMemory(filename string) error {
@@ -194,6 +207,14 @@ func (p PostgresStorage) UpdateMetrics(metrics []metric.Metrics) ([]metric.Metri
 	if err != nil {
 		log.Error("Error updating metrics: ", err)
 		return nil, err
+	}
+
+	if config.GetConfig().StoreInterval == 0 {
+		for _, m := range metrics {
+			err = UpdateMetricInFile(m)
+			log.Error(err)
+			return nil, err
+		}
 	}
 
 	return metrics, nil
