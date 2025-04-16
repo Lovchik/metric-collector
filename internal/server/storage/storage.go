@@ -1,78 +1,99 @@
 package storage
 
 import (
-	"bufio"
+	"encoding/json"
 	"errors"
-	"fmt"
 	log "github.com/sirupsen/logrus"
+	"io"
+	"metric-collector/internal/retry"
+	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
 	"os"
-	"strconv"
-	"strings"
 )
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		metrics: make(map[string]any),
+		metrics: make(map[string]metric.Metrics),
 	}
 }
 
 type Storage interface {
-	SetMetric(name string, value any)
-	GetMetricValueByName(name string) (any, bool)
-	GetAllMetrics() map[string]any
-	UpdateMetric(metric.Metric) (metric.Metric, error)
+	SetMetric(metric.Metrics) error
+	GetMetricValueByName(name string) (metric.Metrics, bool)
+	GetAllMetrics() (map[string]metric.Metrics, error)
+	UpdateMetric(metric.Metrics) (metric.Metrics, error)
 	LoadMetricsInMemory(string) error
 	SaveMemoryInfo(string) error
+	UpdateMetrics([]metric.Metrics) ([]metric.Metrics, error)
+	HealthCheck() (err error)
 }
 
-func (m *MemStorage) SetMetric(name string, value any) {
-	m.metrics[name] = value
+func (m *MemStorage) HealthCheck() error {
+	return nil
 }
-func (m *MemStorage) GetMetricValueByName(name string) (any, bool) {
+
+func (m *MemStorage) SetMetric(metric metric.Metrics) error {
+	m.metrics[metric.ID] = metric
+	return nil
+}
+func (m *MemStorage) GetMetricValueByName(name string) (metric.Metrics, bool) {
 	v, ok := m.metrics[name]
 	return v, ok
 }
 
 type MemStorage struct {
-	metrics map[string]any
+	metrics map[string]metric.Metrics
 }
 
-func (m *MemStorage) GetAllMetrics() map[string]any {
-	return m.metrics
+func (m *MemStorage) GetAllMetrics() (map[string]metric.Metrics, error) {
+	return m.metrics, nil
 }
 
-func (m *MemStorage) UpdateMetric(metr metric.Metric) (metric.Metric, error) {
-	if counter, ok := metr.(metric.Counter); ok {
-		lastValue, ok := m.GetMetricValueByName(counter.GetName())
+func (m *MemStorage) UpdateMetric(metr metric.Metrics) (metric.Metrics, error) {
+	if metr.MType == "counter" {
+		lastValue, ok := m.GetMetricValueByName(metr.ID)
 		if !ok {
-			value := counter.GetValue().(int64)
-			m.SetMetric(counter.GetName(), value)
-			return counter, nil
-		}
-		lastInt, ok := lastValue.(int64)
-		if !ok {
-			return nil, errors.New("last value is not a ubt64")
+			err := m.SetMetric(metr)
+			if err != nil {
+				return metric.Metrics{}, err
+			}
+			return metr, nil
 		}
 
-		value := lastInt + (counter.GetValue().(int64))
-		m.SetMetric(counter.GetName(), value)
-		counter.Value = value
-		return counter, nil
+		*metr.Delta = *metr.Delta + *lastValue.Delta
+		err := m.SetMetric(metr)
+		if err != nil {
+			return metric.Metrics{}, err
+		}
+		return metr, nil
 	}
 
-	if gauge, ok := metr.(metric.Gauge); ok {
-		m.SetMetric(gauge.GetName(), gauge.GetValue().(float64))
-		return gauge, nil
+	if metr.MType == "gauge" {
+		err := m.SetMetric(metr)
+		if err != nil {
+			return metric.Metrics{}, err
+		}
+		return metr, nil
 	}
 
-	return nil, errors.New("unknown metric type")
+	if config.GetConfig().StoreInterval == 0 {
+		err := UpdateMetricInFile(metr)
+		log.Error(err)
+		return metric.Metrics{}, err
+	}
+
+	return metric.Metrics{}, errors.New("unknown metric type")
 }
 
 func (m *MemStorage) SaveMemoryInfo(filename string) error {
-	all := m.GetAllMetrics()
+	metrics, err := m.GetAllMetrics()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	all := metrics
 
-	err := saveMapEntryToFile(filename, all)
+	err = saveMapEntryToFile(filename, all)
 	if err != nil {
 		log.Error(err)
 		return err
@@ -82,81 +103,45 @@ func (m *MemStorage) SaveMemoryInfo(filename string) error {
 
 }
 
-func saveMapEntryToFile(filename string, data map[string]any) error {
+func saveMapEntryToFile(filename string, data map[string]metric.Metrics) error {
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer file.Close()
 
-	existingData := make(map[string]string)
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			existingData[parts[0]] = parts[1]
-		}
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(data); err != nil {
+		panic(err)
 	}
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	for key, value := range data {
-		var valueStr string
-		switch v := value.(type) {
-		case int, int64:
-			valueStr = fmt.Sprintf("%d", v)
-		case float64:
-			valueStr = strconv.FormatFloat(v, 'f', -1, 64)
-		case string:
-			valueStr = v
-		default:
-			return fmt.Errorf("unsupported value type for key %s", key)
-		}
-		existingData[key] = valueStr
-	}
-
-	file.Seek(0, 0)
-	file.Truncate(0)
-	writer := bufio.NewWriter(file)
-	for k, v := range existingData {
-		fmt.Fprintf(writer, "%s=%s\n", k, v)
-	}
-	writer.Flush()
 
 	return nil
 }
 
-func getMetricsFromFile(filename string) ([]metric.Metric, error) {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
+func getMetricsFromFile(filename string) ([]metric.Metrics, error) {
+	file, err := retry.Retry(3, 1, func() (*os.File, error) {
+		return os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
+	})
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer file.Close()
 
-	var metrics []metric.Metric
-	scanner := bufio.NewScanner(file)
+	decoder := json.NewDecoder(file)
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
+	var metricMap map[string]metric.Metrics
+	if err := decoder.Decode(&metricMap); err != nil {
+		if errors.Is(err, io.EOF) {
+			return []metric.Metrics{}, nil
 		}
-
-		name := parts[0]
-		valueStr := parts[1]
-
-		if intValue, err := strconv.ParseInt(valueStr, 10, 64); err == nil {
-			metrics = append(metrics, metric.Counter{Name: name, Value: intValue})
-		} else if floatValue, err := strconv.ParseFloat(valueStr, 64); err == nil {
-			metrics = append(metrics, metric.Gauge{Name: name, Value: floatValue})
-		}
+		return nil, err
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
+	metrics := make([]metric.Metrics, 0, len(metricMap))
+	for _, m := range metricMap {
+		metrics = append(metrics, m)
 	}
 
 	return metrics, nil
@@ -174,8 +159,71 @@ func (m *MemStorage) LoadMetricsInMemory(filename string) error {
 			return err
 		}
 	}
-	all := m.GetAllMetrics()
-	log.Info(all)
 	return nil
+}
 
+func (m *MemStorage) UpdateMetrics(metrics []metric.Metrics) ([]metric.Metrics, error) {
+	if m.metrics == nil {
+		m.metrics = make(map[string]metric.Metrics)
+	}
+
+	for _, newMetric := range metrics {
+		existing, exists := m.metrics[newMetric.ID]
+
+		switch newMetric.MType {
+		case "counter":
+			if exists && existing.Delta != nil && newMetric.Delta != nil {
+				sum := *existing.Delta + *newMetric.Delta
+				existing.Delta = &sum
+				m.metrics[newMetric.ID] = existing
+			} else {
+				m.metrics[newMetric.ID] = newMetric
+			}
+		case "gauge":
+			m.metrics[newMetric.ID] = newMetric
+		default:
+			return nil, errors.New("unsupported metric type ")
+		}
+	}
+	if config.GetConfig().StoreInterval == 0 {
+		for _, m := range metrics {
+			err := UpdateMetricInFile(m)
+			log.Error(err)
+			return nil, err
+		}
+	}
+
+	return metrics, nil
+}
+
+func UpdateMetricInFile(metr metric.Metrics) error {
+	metrics, err := getMetricsFromFile(config.GetConfig().FileStoragePath)
+	if err != nil {
+		return err
+	}
+
+	metricMap := make(map[string]metric.Metrics)
+	for _, m := range metrics {
+		metricMap[m.ID] = m
+	}
+
+	metricMap[metr.ID] = metr
+
+	updatedMetrics := make([]metric.Metrics, 0, len(metricMap))
+	for _, m := range metricMap {
+		updatedMetrics = append(updatedMetrics, m)
+	}
+
+	file, err := os.OpenFile(config.GetConfig().FileStoragePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	if err := encoder.Encode(updatedMetrics); err != nil {
+		return err
+	}
+
+	return nil
 }

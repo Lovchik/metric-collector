@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -8,7 +9,6 @@ import (
 	"metric-collector/internal/server/handlers"
 	"metric-collector/internal/server/services"
 	"metric-collector/internal/server/storage"
-	"time"
 )
 
 func main() {
@@ -20,24 +20,29 @@ func Serve() {
 	s := &services.Service{}
 	s.WebServer = gin.Default()
 	s.Store = storage.NewMemStorage()
+
+	if config.GetConfig().DatabaseDNS == "" {
+		s.Store = storage.NewMemStorage()
+	} else {
+		ctx := context.WithoutCancel(context.Background())
+
+		pgStorage, err := storage.NewPgStorage(ctx, config.GetConfig().DatabaseDNS)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		s.Store = pgStorage
+	}
+
 	if config.GetConfig().Restore {
 		err := s.Store.LoadMetricsInMemory(config.GetConfig().FileStoragePath)
 		if err != nil {
 			log.Error("Error loading metrics: ", err)
-
 		}
 	}
-	go func() {
-		for {
-			if config.GetConfig().StoreInterval > 0 {
-				time.Sleep(time.Duration(config.GetConfig().StoreInterval) * time.Second)
-			}
-			err := s.Store.SaveMemoryInfo(config.GetConfig().FileStoragePath)
-			if err != nil {
-				log.Error(err)
-			}
-		}
-	}()
+	if config.GetConfig().StoreInterval > 0 {
+		go s.SaveMetricsToMemory()
+	}
 	ginConfig := cors.DefaultConfig()
 	ginConfig.AllowAllOrigins = true
 	s.WebServer.Use(cors.New(ginConfig))
