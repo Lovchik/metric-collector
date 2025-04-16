@@ -13,7 +13,7 @@ import (
 	"metric-collector/internal/agent/metric"
 	"metric-collector/internal/retry"
 	"net/http"
-	url2 "net/url"
+	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
@@ -41,12 +41,12 @@ func (a *Agent) Start() {
 			log.Info("UpdateMetric MemStats")
 		}
 	}()
-	updatesURL := url2.URL{
+	updatesURL := url.URL{
 		Scheme: "http",
 		Host:   config.GetConfig().FlagRunAddr,
 		Path:   "/updates",
 	}
-	updateURL := url2.URL{
+	updateURL := url.URL{
 		Scheme: "http",
 		Host:   config.GetConfig().FlagRunAddr,
 		Path:   "/update",
