@@ -7,53 +7,34 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
+	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
 	"time"
 )
 
 func (p PostgresStorage) SetMetric(metric metric.Metrics) error {
-	tx, err := p.Conn.Begin(context.Background())
-	if err != nil {
-		log.Error("Error starting transaction: ", err)
-		return err
-	}
-	exec, err := tx.Exec(context.Background(), "delete from metrics where id = $1 ", metric.ID)
+	query := `
+		INSERT INTO metrics (id, type, value, delta)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (id) DO UPDATE 
+		SET type = EXCLUDED.type,
+		    value = EXCLUDED.value,
+		    delta = EXCLUDED.delta;
+	`
+
+	exec, err := p.Conn.Exec(context.Background(), query, metric.ID, metric.MType, metric.Value, metric.Delta)
 	log.Info("exec ", exec)
 	if err != nil {
-		log.Error(err)
-		err := tx.Rollback(context.Background())
-		if err != nil {
-			log.Error(err)
-			return err
-		}
-	}
-
-	var id string
-	err = tx.QueryRow(context.Background(), "INSERT INTO metrics (id, type, value, delta) VALUES ($1,$2,$3,$4) RETURNING id", metric.ID, metric.MType, metric.Value, metric.Delta).Scan(&id)
-	if err != nil {
-		err = tx.Rollback(context.Background())
-		if err != nil {
-			log.Error(err)
-			return err
-		}
+		log.Error("Insert or update error: ", err)
 		return err
 	}
-	return tx.Commit(context.Background())
+
+	return nil
 }
 
 func (p PostgresStorage) GetMetricValueByName(name string) (metric.Metrics, bool) {
 	var metrics metric.Metrics
-	var count int64
-	err := p.Conn.QueryRow(context.Background(), "select count(metrics) from metrics where id = $1", name).Scan(&count)
-	if err != nil {
-		log.Error(err)
-		return metrics, false
-	}
-	if count == 0 {
-		log.Info("metrics not found")
-		return metrics, false
-	}
-	err = p.Conn.QueryRow(context.Background(), "select * from metrics where id = $1", name).Scan(&metrics.ID, &metrics.MType, &metrics.Value, &metrics.Delta)
+	err := p.Conn.QueryRow(context.Background(), "select * from metrics where id = $1", name).Scan(&metrics.ID, &metrics.MType, &metrics.Value, &metrics.Delta)
 	if err != nil {
 		log.Error(err)
 		return metrics, false
@@ -113,6 +94,11 @@ func (p PostgresStorage) UpdateMetric(metr metric.Metrics) (metric.Metrics, erro
 			if err != nil {
 				return metric.Metrics{}, err
 			}
+			if config.GetConfig().StoreInterval == 0 {
+				err := UpdateMetricInFile(metr)
+				log.Error(err)
+				return metric.Metrics{}, err
+			}
 			return metr, nil
 		}
 	case "gauge":
@@ -121,13 +107,20 @@ func (p PostgresStorage) UpdateMetric(metr metric.Metrics) (metric.Metrics, erro
 			if err != nil {
 				return metric.Metrics{}, err
 			}
+			if config.GetConfig().StoreInterval == 0 {
+				err := UpdateMetricInFile(metr)
+				log.Error(err)
+				return metric.Metrics{}, err
+			}
 			return metr, nil
 		}
 	default:
 		{
 			return metric.Metrics{}, errors.New("invalid metric type ")
 		}
+
 	}
+
 }
 
 func (p PostgresStorage) LoadMetricsInMemory(filename string) error {
@@ -214,6 +207,14 @@ func (p PostgresStorage) UpdateMetrics(metrics []metric.Metrics) ([]metric.Metri
 	if err != nil {
 		log.Error("Error updating metrics: ", err)
 		return nil, err
+	}
+
+	if config.GetConfig().StoreInterval == 0 {
+		for _, m := range metrics {
+			err = UpdateMetricInFile(m)
+			log.Error(err)
+			return nil, err
+		}
 	}
 
 	return metrics, nil

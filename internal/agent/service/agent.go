@@ -16,6 +16,7 @@ import (
 	"metric-collector/internal/agent/metric"
 	"metric-collector/internal/retry"
 	"net/http"
+	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
@@ -43,6 +44,16 @@ func (a *Agent) Start() {
 			log.Info("UpdateMetric MemStats")
 		}
 	}()
+	updatesURL := url.URL{
+		Scheme: "http",
+		Host:   config.GetConfig().FlagRunAddr,
+		Path:   "/updates",
+	}
+	updateURL := url.URL{
+		Scheme: "http",
+		Host:   config.GetConfig().FlagRunAddr,
+		Path:   "/update",
+	}
 	go func() {
 		defer wg.Done()
 		client := &http.Client{}
@@ -72,18 +83,20 @@ func (a *Agent) Start() {
 				default:
 					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
 				}
-				err := sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", metricToUpload, client)
+				err := sendHTTPRequest(updateURL.String(), metricToUpload, client)
 				if err != nil {
 					log.Error(err)
+					continue
 				}
 
 				toUpload = append(toUpload, metricToUpload)
 
 			}
 			if len(toUpload) > 0 {
-				err := sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/updates", toUpload, client)
+				err := sendHTTPRequest(updatesURL.String(), toUpload, client)
 				if err != nil {
 					log.Error(err)
+					continue
 				}
 
 			}

@@ -23,7 +23,7 @@ func GetConfig() Config {
 func InitConfig() {
 	config := Config{}
 
-	getEnv("ADDRESS", "a", ":8080", "Server address", &config.FlagRunAddr)
+	getEnv("ADDRESS", "a", "localhost:8080", "Server address", &config.FlagRunAddr)
 	getEnv("KEY", "k", "123123", "KEY", &config.Key)
 	getEnvInt("REPORT_INTERVAL", "r", 3, "Report interval", &config.ReportInterval)
 	getEnvInt("POLL_INTERVAL", "p", 1, "Poll interval", &config.PollInterval)

@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+var AttemptsDelay = 2 * time.Second
+
 func Retry[T any](attempts int, delay time.Duration, function func() (T, error)) (T, error) {
 	var err error
 	var result T
@@ -23,7 +25,7 @@ func Retry[T any](attempts int, delay time.Duration, function func() (T, error))
 		if i < attempts-1 {
 			time.Sleep(delay)
 		}
-		delay += 2
+		delay += AttemptsDelay
 	}
 
 	return result, err
