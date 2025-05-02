@@ -3,6 +3,9 @@ package service
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/dranikpg/dto-mapper"
@@ -78,7 +81,7 @@ func (a *Agent) Start() {
 
 			}
 			if len(toUpload) > 0 {
-				err := sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", toUpload, client)
+				err := sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/updates", toUpload, client)
 				if err != nil {
 					log.Error(err)
 				}
@@ -126,7 +129,7 @@ func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Cl
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
-
+	addHashedHeader(req)
 	resp, err := retry.Retry(3, 1, func() (*http.Response, error) {
 		return client.Do(req)
 	})
@@ -160,4 +163,21 @@ func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Cl
 	log.Info("Response Status: ", resp.Status, " Response Body: ", string(responseBody))
 	log.Info(baseURL)
 	return nil
+}
+
+func addHashedHeader(req *http.Request) {
+	if config.GetConfig().Key != "" {
+		jsonData, err := io.ReadAll(req.Body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		// Restore the Body so it can be read again by the HTTP client
+		req.Body = io.NopCloser(bytes.NewReader(jsonData))
+		h := hmac.New(sha256.New, []byte(config.GetConfig().Key))
+		h.Write(jsonData)
+		result := h.Sum(nil)
+		hashStr := hex.EncodeToString(result[:])
+		req.Header.Set("HashSHA256", hashStr)
+	}
 }

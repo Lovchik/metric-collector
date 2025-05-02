@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 )
@@ -10,6 +11,7 @@ var appConfig Config
 
 type Config struct {
 	FlagRunAddr    string
+	Key            string
 	ReportInterval int64
 	PollInterval   int64
 }
@@ -22,6 +24,7 @@ func InitConfig() {
 	config := Config{}
 
 	getEnv("ADDRESS", "a", ":8080", "Server address", &config.FlagRunAddr)
+	getEnv("KEY", "k", "123123", "KEY", &config.Key)
 	getEnvInt("REPORT_INTERVAL", "r", 3, "Report interval", &config.ReportInterval)
 	getEnvInt("POLL_INTERVAL", "p", 1, "Poll interval", &config.PollInterval)
 	flag.Parse()
@@ -30,10 +33,11 @@ func InitConfig() {
 }
 
 func getEnv(envName, flagName, defaultValue, usage string, config *string) {
+	flag.StringVar(config, flagName, defaultValue, usage)
+
 	if value := os.Getenv(envName); value != "" {
+		log.Info("Using environment variable "+envName, "value "+value)
 		*config = value
-	} else {
-		flag.StringVar(config, flagName, defaultValue, usage)
 	}
 
 }

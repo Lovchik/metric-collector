@@ -16,6 +16,8 @@ func Retry[T any](attempts int, delay time.Duration, function func() (T, error))
 				log.Info("Successfully ran ", result)
 			}
 			return result, nil
+		} else {
+			log.Error(err)
 		}
 
 		if i < attempts-1 {
