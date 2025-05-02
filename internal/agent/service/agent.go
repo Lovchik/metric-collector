@@ -185,7 +185,6 @@ func addHashedHeader(req *http.Request) {
 			log.Error(err)
 			return
 		}
-		// Restore the Body so it can be read again by the HTTP client
 		req.Body = io.NopCloser(bytes.NewReader(jsonData))
 		h := hmac.New(sha256.New, []byte(config.GetConfig().Key))
 		h.Write(jsonData)

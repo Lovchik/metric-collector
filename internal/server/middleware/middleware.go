@@ -97,6 +97,7 @@ func AuthMiddleware() gin.HandlerFunc {
 				c.AbortWithStatus(http.StatusBadRequest)
 				return
 			}
+			c.Request.Body = io.NopCloser(bytes.NewReader(jsonData))
 			h := hmac.New(sha256.New, []byte(config.GetConfig().Key))
 			h.Write(jsonData)
 			result := h.Sum(nil)
