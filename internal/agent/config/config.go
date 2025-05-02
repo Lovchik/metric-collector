@@ -29,6 +29,7 @@ func InitConfig() {
 	getEnvInt("POLL_INTERVAL", "p", 1, "Poll interval", &config.PollInterval)
 	flag.Parse()
 	appConfig = config
+	log.Info("Agent config : ", config)
 
 }
 
