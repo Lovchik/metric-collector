@@ -24,7 +24,7 @@ func InitConfig() {
 	config := Config{}
 
 	getEnv("ADDRESS", "a", "localhost:8080", "Server address", &config.FlagRunAddr)
-	getEnv("KEY", "k", "123123", "KEY", &config.Key)
+	getEnv("KEY", "k", "", "hash key", &config.Key)
 	getEnvInt("REPORT_INTERVAL", "r", 3, "Report interval", &config.ReportInterval)
 	getEnvInt("POLL_INTERVAL", "p", 1, "Poll interval", &config.PollInterval)
 	flag.Parse()
@@ -37,7 +37,7 @@ func getEnv(envName, flagName, defaultValue, usage string, config *string) {
 	flag.StringVar(config, flagName, defaultValue, usage)
 
 	if value := os.Getenv(envName); value != "" {
-		log.Info("Using environment variable "+envName, "value "+value)
+		log.Info("Using environment variable "+envName, "- value "+value)
 		*config = value
 	}
 
