@@ -14,6 +14,7 @@ type Config struct {
 	Key            string
 	ReportInterval int64
 	PollInterval   int64
+	RateLimit      int64
 }
 
 func GetConfig() Config {
@@ -22,7 +23,7 @@ func GetConfig() Config {
 
 func InitConfig() {
 	config := Config{}
-
+	getEnvInt("RATE_LIMIT", "l", 0, "rate limit", &config.RateLimit)
 	getEnv("ADDRESS", "a", "localhost:8080", "Server address", &config.FlagRunAddr)
 	getEnv("KEY", "k", "", "hash key", &config.Key)
 	getEnvInt("REPORT_INTERVAL", "r", 3, "Report interval", &config.ReportInterval)
