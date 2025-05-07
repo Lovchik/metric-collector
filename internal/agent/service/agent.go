@@ -67,7 +67,6 @@ func (a *Agent) Start() {
 					switch i {
 					case 0:
 						a.Stats.CPUutilization1 = p
-						// можно добавить дополнительные поля, если нужно
 					}
 				}
 				a.StatsMu.Unlock()
