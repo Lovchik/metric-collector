@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 )
@@ -10,8 +11,10 @@ var appConfig Config
 
 type Config struct {
 	FlagRunAddr    string
+	Key            string
 	ReportInterval int64
 	PollInterval   int64
+	RateLimit      int64
 }
 
 func GetConfig() Config {
@@ -20,20 +23,23 @@ func GetConfig() Config {
 
 func InitConfig() {
 	config := Config{}
-
+	getEnvInt("RATE_LIMIT", "l", 0, "rate limit", &config.RateLimit)
 	getEnv("ADDRESS", "a", "localhost:8080", "Server address", &config.FlagRunAddr)
+	getEnv("KEY", "k", "", "hash key", &config.Key)
 	getEnvInt("REPORT_INTERVAL", "r", 3, "Report interval", &config.ReportInterval)
 	getEnvInt("POLL_INTERVAL", "p", 1, "Poll interval", &config.PollInterval)
 	flag.Parse()
 	appConfig = config
+	log.Info("Agent config : ", config)
 
 }
 
 func getEnv(envName, flagName, defaultValue, usage string, config *string) {
+	flag.StringVar(config, flagName, defaultValue, usage)
+
 	if value := os.Getenv(envName); value != "" {
+		log.Info("Using environment variable "+envName, "- value "+value)
 		*config = value
-	} else {
-		flag.StringVar(config, flagName, defaultValue, usage)
 	}
 
 }

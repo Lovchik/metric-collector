@@ -3,10 +3,14 @@ package services
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	"io"
 	"metric-collector/internal/server/config"
 	"metric-collector/internal/server/metric"
 	"metric-collector/internal/server/storage"
@@ -50,6 +54,7 @@ func (s *Service) UpdateMetric(c *gin.Context) {
 
 	}
 	c.JSON(http.StatusOK, nil)
+	addHashedHeader(c)
 }
 
 func (s *Service) UpdateMetricViaJSON(ctx *gin.Context) {
@@ -87,8 +92,10 @@ func (s *Service) UpdateMetricViaJSON(ctx *gin.Context) {
 		}
 		gz.Close()
 		ctx.Data(http.StatusOK, "application/json", buf.Bytes())
+		addHashedHeader(ctx)
 	} else {
 		ctx.JSON(http.StatusOK, metrics)
+		addHashedHeader(ctx)
 	}
 }
 
@@ -149,6 +156,7 @@ func (s *Service) GetMetric(ctx *gin.Context) {
 	ctx.Header("Content-Type", "text/html")
 	ctx.Header("Content-Type", "application/json")
 	ctx.JSON(http.StatusOK, value)
+	addHashedHeader(ctx)
 
 }
 func (s *Service) GetAllMetrics(context *gin.Context) {
@@ -174,6 +182,7 @@ func (s *Service) GetAllMetrics(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, all)
+	addHashedHeader(context)
 }
 
 type gzipResponseWriter struct {
@@ -197,6 +206,7 @@ func (s *Service) GetGauge(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, value.Value)
+	addHashedHeader(c)
 }
 
 func (s *Service) GetCounter(c *gin.Context) {
@@ -212,7 +222,7 @@ func (s *Service) GetCounter(c *gin.Context) {
 	}
 	log.Info(value)
 	c.JSON(http.StatusOK, value.Delta)
-
+	addHashedHeader(c)
 }
 
 func validateMetricsToUpdate(c *gin.Context) {
@@ -289,8 +299,27 @@ func (s *Service) UpdateMetrics(ctx *gin.Context) {
 		}
 		gz.Close()
 		ctx.Data(http.StatusOK, "application/json", buf.Bytes())
+		addHashedHeader(ctx)
 	} else {
 		ctx.JSON(http.StatusOK, metrics)
+		addHashedHeader(ctx)
 	}
 
+}
+
+func addHashedHeader(c *gin.Context) {
+	if config.GetConfig().Key != "" {
+		jsonData, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(jsonData))
+
+		h := hmac.New(sha256.New, []byte(config.GetConfig().Key))
+		h.Write(jsonData)
+		result := h.Sum(nil)
+		hashStr := hex.EncodeToString(result[:])
+		c.Header("HashSHA256", hashStr)
+	}
 }
