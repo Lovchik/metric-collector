@@ -15,6 +15,7 @@ type Config struct {
 	FileStoragePath string
 	Restore         bool
 	DatabaseDNS     string
+	Key             string
 }
 
 func GetConfig() Config {
@@ -24,14 +25,15 @@ func GetConfig() Config {
 func InitConfig() {
 	config := Config{}
 
+	getEnv("KEY", "k", "", "hash key", &config.Key)
 	getEnv("ADDRESS", "a", ":8080", "Server address", &config.FlagRunAddr)
 	getEnvInt("STORE_INTERVAL", "i", 300, "Report interval", &config.StoreInterval)
 	getEnv("FILE_STORAGE_PATH", "f", "file.json", "file storage path ", &config.FileStoragePath)
 	getEnv("DATABASE_DSN", "d", "", "file storage path ", &config.DatabaseDNS)
 	getEnvBool("RESTORE", "r", false, "Poll interval", &config.Restore)
 	flag.Parse()
-	log.Info("Config: ", config)
 	appConfig = config
+	log.Info("Server config : ", config)
 
 }
 
@@ -39,6 +41,7 @@ func getEnv(envName, flagName, defaultValue, usage string, config *string) {
 	flag.StringVar(config, flagName, defaultValue, usage)
 
 	if value := os.Getenv(envName); value != "" {
+		log.Info("Using environment variable "+envName, "- value "+value)
 		*config = value
 	}
 }

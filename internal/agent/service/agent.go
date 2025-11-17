@@ -3,9 +3,13 @@ package service
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"github.com/dranikpg/dto-mapper"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"math/rand"
@@ -13,7 +17,6 @@ import (
 	"metric-collector/internal/agent/metric"
 	"metric-collector/internal/retry"
 	"net/http"
-	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
@@ -27,6 +30,16 @@ type Agent struct {
 }
 
 func (a *Agent) Start() {
+	var rateLimit int64
+	if config.GetConfig().RateLimit <= 0 {
+		rateLimit = 1
+	} else {
+		rateLimit = config.GetConfig().RateLimit
+	}
+
+	sem := make(chan struct{}, rateLimit)
+	jobs := make(chan metric.MetricsToUpload, 100)
+
 	poller := time.NewTicker(time.Duration(config.GetConfig().PollInterval) * time.Second)
 	reporter := time.NewTicker(time.Duration(config.GetConfig().ReportInterval) * time.Second)
 	defer poller.Stop()
@@ -34,6 +47,35 @@ func (a *Agent) Start() {
 	a.Stats.PollCount = 0
 	wg := sync.WaitGroup{}
 	wg.Add(2)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			vmStat, err := mem.VirtualMemory()
+			if err == nil {
+				a.StatsMu.Lock()
+				a.Stats.TotalMemory = float64(vmStat.Total)
+				a.Stats.FreeMemory = float64(vmStat.Free)
+				a.StatsMu.Unlock()
+			}
+
+			cpuPercents, err := cpu.Percent(0, true)
+			if err == nil {
+				a.StatsMu.Lock()
+				for i, p := range cpuPercents {
+					switch i {
+					case 0:
+						a.Stats.CPUutilization1 = p
+					}
+				}
+				a.StatsMu.Unlock()
+			}
+
+			time.Sleep(time.Duration(config.GetConfig().PollInterval) * time.Second)
+		}
+	}()
+
 	go func() {
 		defer wg.Done()
 		for range poller.C {
@@ -41,24 +83,13 @@ func (a *Agent) Start() {
 			log.Info("UpdateMetric MemStats")
 		}
 	}()
-	updatesURL := url.URL{
-		Scheme: "http",
-		Host:   config.GetConfig().FlagRunAddr,
-		Path:   "/updates",
-	}
-	updateURL := url.URL{
-		Scheme: "http",
-		Host:   config.GetConfig().FlagRunAddr,
-		Path:   "/update",
-	}
+
 	go func() {
 		defer wg.Done()
-		client := &http.Client{}
 		for range reporter.C {
-			var toUpload []metric.MetricsToUpload
+			a.StatsMu.Lock()
 			v := reflect.ValueOf(a.Stats)
 			t := reflect.TypeOf(a.Stats)
-
 			for i := 0; i < v.NumField(); i++ {
 				field := t.Field(i)
 				value := v.Field(i)
@@ -69,37 +100,39 @@ func (a *Agent) Start() {
 				switch field.Type.Kind() {
 				case reflect.Int64, reflect.Int32:
 					metricToUpload.MType = "counter"
-					metricToUpload.Delta = new(int64)
 					i2 := value.Int()
 					metricToUpload.Delta = &i2
-
 				case reflect.Float64:
 					metricToUpload.MType = "gauge"
-					metricToUpload.Value = new(float64)
-					*metricToUpload.Value = value.Float()
+					f := value.Float()
+					metricToUpload.Value = &f
 				default:
-					fmt.Printf("%s имеет неизвестный тип: %s\n", field.Name, field.Type)
-				}
-				err := sendHTTPRequest(updateURL.String(), metricToUpload, client)
-				if err != nil {
-					log.Error(err)
 					continue
 				}
 
-				toUpload = append(toUpload, metricToUpload)
-
+				jobs <- metricToUpload
 			}
-			if len(toUpload) > 0 {
-				err := sendHTTPRequest(updatesURL.String(), toUpload, client)
-				if err != nil {
-					log.Error(err)
-					continue
-				}
-
-			}
+			a.StatsMu.Unlock()
 		}
-
 	}()
+
+	for i := 0; i < int(rateLimit); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			client := &http.Client{}
+			for m := range jobs {
+				sem <- struct{}{}
+				err := sendHTTPRequest("http://"+config.GetConfig().FlagRunAddr+"/update", m, client)
+				if err != nil {
+					log.Error(err)
+				}
+				<-sem
+			}
+		}()
+	}
+
+	defer close(jobs)
 
 	wg.Wait()
 }
@@ -139,7 +172,7 @@ func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Cl
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
-
+	addHashedHeader(req)
 	resp, err := retry.Retry(3, 1, func() (*http.Response, error) {
 		return client.Do(req)
 	})
@@ -173,4 +206,20 @@ func sendHTTPRequest(baseURL string, metricToUpload interface{}, client *http.Cl
 	log.Info("Response Status: ", resp.Status, " Response Body: ", string(responseBody))
 	log.Info(baseURL)
 	return nil
+}
+
+func addHashedHeader(req *http.Request) {
+	if config.GetConfig().Key != "" {
+		jsonData, err := io.ReadAll(req.Body)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		req.Body = io.NopCloser(bytes.NewReader(jsonData))
+		h := hmac.New(sha256.New, []byte(config.GetConfig().Key))
+		h.Write(jsonData)
+		result := h.Sum(nil)
+		hashStr := hex.EncodeToString(result[:])
+		req.Header.Set("HashSHA256", hashStr)
+	}
 }

@@ -3,9 +3,12 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"metric-collector/internal/agent/config"
 	"net/http"
 	"strings"
 	"time"
@@ -82,4 +85,27 @@ func GzipMiddleware() gin.HandlerFunc {
 
 func (g *gzipWriter) Write(data []byte) (int, error) {
 	return g.writer.Write(data)
+}
+
+func AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if config.GetConfig().Key != "" {
+			header := c.GetHeader("HashSHA256")
+			jsonData, err := io.ReadAll(c.Request.Body)
+			if err != nil {
+				log.Error(err)
+				c.AbortWithStatus(http.StatusBadRequest)
+				return
+			}
+			c.Request.Body = io.NopCloser(bytes.NewReader(jsonData))
+			h := hmac.New(sha256.New, []byte(config.GetConfig().Key))
+			h.Write(jsonData)
+			result := h.Sum(nil)
+			if hmac.Equal(result, []byte(header)) {
+				c.Next()
+			}
+
+		}
+		c.Next()
+	}
 }
